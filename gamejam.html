@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>STONE GAZE — Medusa Platformer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital@0;1&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0608;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Cinzel', serif;
+    overflow: hidden;
+  }
+
+  #title {
+    color: #c9a84c;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 20px #c9a84c88, 0 0 40px #c9a84c44;
+    margin-bottom: 6px;
+  }
+
+  #subtitle {
+    color: #7a5c2e;
+    font-family: 'Crimson Text', serif;
+    font-style: italic;
+    font-size: 0.9rem;
+    letter-spacing: 0.2em;
+    margin-bottom: 12px;
+  }
+
+  #gameWrapper {
+    position: relative;
+    border: 2px solid #3a2a1a;
+    box-shadow: 0 0 60px #c9a84c22, inset 0 0 40px #00000088;
+  }
+
+  canvas {
+    display: block;
+    background: #0f0810;
+  }
+
+  #ui {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 8px 16px;
+    background: #0a0608;
+    border-top: 1px solid #3a2a1a;
+    color: #c9a84c;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+  }
+
+  #deathCount { color: #8b3a3a; }
+  #hint {
+    color: #5a4a2a;
+    font-family: 'Crimson Text', serif;
+    font-style: italic;
+    font-size: 0.8rem;
+  }
+
+  #overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #c9a84c;
+    pointer-events: none;
+    transition: opacity 0.5s;
+  }
+
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+
+  #overlayTitle {
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 30px #c9a84c;
+    margin-bottom: 12px;
+  }
+
+  #overlayMsg {
+    font-family: 'Crimson Text', serif;
+    font-style: italic;
+    font-size: 1.1rem;
+    color: #a0804a;
+    margin-bottom: 20px;
+  }
+
+  #overlayKey {
+    font-size: 0.75rem;
+    color: #5a4a2a;
+    letter-spacing: 0.2em;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  #stoneFlash {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(ellipse, #aaaaaa88 0%, transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s;
+  }
+</style>
+</head>
+<body>
+
+<div id="title">STONE GAZE</div>
+<div id="subtitle">a medusa platformer — your stone remains</div>
+
+<div id="gameWrapper">
+  <canvas id="c" width="800" height="480"></canvas>
+  <div id="overlay">
+    <div id="overlayTitle">STONE GAZE</div>
+    <div id="overlayMsg">Her eyes met yours. You are marble now.</div>
+    <div id="overlayKey">PRESS SPACE OR CLICK TO BEGIN</div>
+  </div>
+  <div id="stoneFlash"></div>
+</div>
+
+<div id="ui">
+  <span id="deathCount">PETRIFICATIONS: 0</span>
+  <span id="hint">Your stone body persists — climb upon your past failures</span>
+  <span id="keys">← → MOVE &nbsp;|&nbsp; SPACE JUMP</span>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+const overlayTitle = document.getElementById('overlayTitle');
+const overlayMsg = document.getElementById('overlayMsg');
+const overlayKey = document.getElementById('overlayKey');
+const stoneFlash = document.getElementById('stoneFlash');
+const deathCountEl = document.getElementById('deathCount');
+
+const W = 800, H = 480;
+const GRAVITY = 0.45;
+const TILE = 32;
+
+// --- LEVEL DESIGN ---
+// The level is designed so that there's a tall cliff that needs ~2 stone bodies to reach
+// Platforms are arranged to force creative use of stone statues
+const LEVEL = {
+  platforms: [
+    // === SAFE START ZONE (no medusas here) ===
+    {x:0,   y:448, w:320, h:32},   // long safe starting ground
+    {x:0,   y:360, w:100, h:16},   // low ledge left side
+
+    // === SECTION 2: first medusa encounter, easy gap ===
+    {x:340, y:448, w:160, h:32},   // platform with one medusa patrolling
+    {x:340, y:370, w:80,  h:16},   // upper escape ledge to duck past
+
+    // === SECTION 3: second medusa, stepping stone platforms ===
+    {x:520, y:448, w:160, h:32},
+    {x:560, y:370, w:70,  h:16},
+    {x:620, y:300, w:60,  h:16},
+
+    // === THE TALL CLIFF PUZZLE — needs stone statues to climb ===
+    {x:700, y:448, w:220, h:32},   // base of cliff
+    // These ledges are just out of reach — player needs statues as stepping stones:
+    {x:730, y:352, w:80,  h:16},   // ledge 1: ~96px up — just reachable alone
+    {x:760, y:264, w:80,  h:16},   // ledge 2: ~88px higher — needs 1 statue
+    {x:780, y:180, w:70,  h:16},   // ledge 3: ~84px higher — needs 2nd statue
+    // Goal
+    {x:790, y:100, w:80,  h:16},   // victory ledge — needs 3rd statue OR lucky jump
+
+    // ceiling
+    {x:0,   y:0,   w:920, h:8},
+  ],
+  medusas: [
+    // Section 2 — slow, short patrol, long alert time so player can learn
+    {spawnX:420, spawnY:416, left:345, right:490},
+    // Section 3 — two medusas but with gaps between them
+    {spawnX:560, spawnY:416, left:525, right:670},
+    {spawnX:590, spawnY:338, left:545, right:625},
+  ],
+  playerStart: {x:30, y:400},
+  goal: {x:795, y:68, w:60, h:32},
+};
+
+// --- STATE ---
+let gameState = 'start'; // start, playing, petrified, won
+let deaths = 0;
+let statues = []; // stone bodies left by player
+let medusas = [];
+let particles = [];
+let player;
+let keys = {};
+let petrifyTimer = 0;
+let wonTimer = 0;
+let cameraX = 0;
+
+// --- PLAYER ---
+function createPlayer(x, y) {
+  return {
+    x, y, w: 24, h: 32,
+    vx: 0, vy: 0,
+    onGround: false,
+    facingRight: true,
+    isStone: false,
+    stoneAnim: 0, // 0=normal, 1=stone (for death anim)
+    walkFrame: 0,
+    walkTimer: 0,
+  };
+}
+
+// --- MEDUSA ---
+function createMedusa(cfg) {
+  return {
+    x: cfg.spawnX, y: cfg.spawnY,
+    w: 28, h: 40,
+    vx: -0.5,
+    left: cfg.left, right: cfg.right,
+    facingRight: false,
+    animFrame: 0,
+    animTimer: 0,
+    sightRange: 110,   // reduced from 160
+    lookDir: -1,
+    alertTimer: 0,
+  };
+}
+
+function resetLevel() {
+  player = createPlayer(LEVEL.playerStart.x, LEVEL.playerStart.y);
+  medusas = LEVEL.medusas.map(createMedusa);
+  particles = [];
+  petrifyTimer = 0;
+}
+
+function init() {
+  statues = [];
+  deaths = 0;
+  deathCountEl.textContent = 'PETRIFICATIONS: 0';
+  resetLevel();
+}
+
+// --- COLLISION ---
+function rectOverlap(a, b) {
+  return a.x < b.x+b.w && a.x+a.w > b.x &&
+         a.y < b.y+b.h && a.y+a.h > b.y;
+}
+
+function resolvePlayer(p, platforms) {
+  p.onGround = false;
+  // Combine real platforms + statues
+  const all = [...platforms, ...statues.map(s => ({x:s.x-2, y:s.y, w:s.w+4, h:s.h}))];
+
+  // vertical
+  p.y += p.vy;
+  for (const pl of all) {
+    if (rectOverlap(p, pl)) {
+      if (p.vy > 0) { p.y = pl.y - p.h; p.onGround = true; p.vy = 0; }
+      else if (p.vy < 0) { p.y = pl.y + pl.h; p.vy = 0; }
+    }
+  }
+
+  // horizontal
+  p.x += p.vx;
+  for (const pl of all) {
+    if (rectOverlap(p, pl)) {
+      if (p.vx > 0) p.x = pl.x - p.w;
+      else if (p.vx < 0) p.x = pl.x + pl.w;
+      p.vx = 0;
+    }
+  }
+
+  // clamp
+  if (p.x < 0) p.x = 0;
+  if (p.x + p.w > 2000) p.x = 2000 - p.w;
+  if (p.y > H + 100) { p.y = H + 100; } // fell
+}
+
+// --- UPDATE ---
+function update() {
+  if (gameState !== 'playing') return;
+
+  // Camera
+  const targetCam = player.x - W/2 + player.w/2;
+  cameraX += (targetCam - cameraX) * 0.1;
+  cameraX = Math.max(0, Math.min(cameraX, 920));
+
+  // Player input — slower, more deliberate movement
+  const speed = 1.6;
+  if (keys['ArrowLeft'] || keys['a']) {
+    player.vx = -speed;
+    player.facingRight = false;
+  } else if (keys['ArrowRight'] || keys['d']) {
+    player.vx = speed;
+    player.facingRight = true;
+  } else {
+    player.vx *= 0.7;
+    if (Math.abs(player.vx) < 0.1) player.vx = 0;
+  }
+
+  if ((keys[' '] || keys['ArrowUp'] || keys['w']) && player.onGround) {
+    player.vy = -10;
+    keys[' '] = false; keys['ArrowUp'] = false; keys['w'] = false;
+    spawnJumpParticles(player);
+  }
+
+  player.vy += GRAVITY;
+  if (player.vy > 14) player.vy = 14;
+
+  resolvePlayer(player, LEVEL.platforms);
+
+  // Walk anim
+  if (player.vx !== 0 && player.onGround) {
+    player.walkTimer++;
+    if (player.walkTimer > 8) { player.walkFrame = (player.walkFrame+1)%4; player.walkTimer=0; }
+  } else if (player.onGround) {
+    player.walkFrame = 0;
+  }
+
+  // Fell off
+  if (player.y > H + 50) petrifyPlayer(false);
+
+  // Medusas
+  for (const m of medusas) {
+    m.animTimer++;
+    if (m.animTimer > 12) { m.animFrame = (m.animFrame+1)%2; m.animTimer=0; }
+
+    // Patrol — statues block medusa path like walls
+    m.x += m.vx;
+    // Collide with statues horizontally
+    for (const s of statues) {
+      const mRect = {x:m.x, y:m.y, w:m.w, h:m.h};
+      if (rectOverlap(mRect, s)) {
+        if (m.vx > 0) { m.x = s.x - m.w; m.vx = -Math.abs(m.vx); m.facingRight = false; m.lookDir = -1; }
+        else if (m.vx < 0) { m.x = s.x + s.w; m.vx = Math.abs(m.vx); m.facingRight = true; m.lookDir = 1; }
+      }
+    }
+    if (m.x <= m.left) { m.vx = Math.abs(m.vx); m.facingRight = true; m.lookDir = 1; }
+    if (m.x + m.w >= m.right) { m.vx = -Math.abs(m.vx); m.facingRight = false; m.lookDir = -1; }
+
+    // Sight check — blocked by statues acting as cover
+    const dx = player.x + player.w/2 - (m.x + m.w/2);
+    const dy = Math.abs(player.y - m.y);
+    const sameDir = (m.lookDir > 0 && dx > 0) || (m.lookDir < 0 && dx < 0);
+    const dist = Math.abs(dx);
+    const mx = m.x + m.w/2;
+    const px = player.x + player.w/2;
+
+    // Check if any statue is between the medusa and player on the same horizontal band
+    let statuBlocksSight = false;
+    for (const s of statues) {
+      const sx = s.x + s.w/2;
+      // Statue is between medusa and player horizontally?
+      const between = (mx < sx && sx < px) || (px < sx && sx < mx);
+      if (between) {
+        // Statue overlaps the vertical band where both medusa and player stand
+        const topOfStatue = s.y;
+        const medusaEyeY = m.y + 8;
+        const playerEyeY = player.y + 8;
+        // If the statue is tall enough to break line of sight
+        if (topOfStatue < Math.max(medusaEyeY, playerEyeY)) {
+          statuBlocksSight = true;
+          break;
+        }
+      }
+    }
+
+    if (sameDir && dist < m.sightRange && dy < 60 && !statuBlocksSight) {
+      m.alertTimer = Math.min(m.alertTimer + 1, 60);
+      if (m.alertTimer > 45) {
+        petrifyPlayer(true);
+      }
+    } else {
+      m.alertTimer = Math.max(m.alertTimer - 3, 0);
+    }
+
+    // Grounded medusa — stands on platforms AND statues
+    m.y += 0.5;
+    let mOnGround = false;
+    const groundSurfaces = [...LEVEL.platforms, ...statues];
+    for (const pl of groundSurfaces) {
+      const mRect = {x:m.x, y:m.y, w:m.w, h:m.h};
+      if (rectOverlap(mRect, pl) && m.y+m.h > pl.y && m.y < pl.y+pl.h) {
+        m.y = pl.y - m.h; mOnGround = true;
+      }
+    }
+    if (!mOnGround) m.y -= 0.5; // don't fall off platforms
+  } // end medusa loop
+
+  // Particles
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.15;
+    p.life -= 1;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // Win check
+  const goal = LEVEL.goal;
+  if (rectOverlap(player, goal)) {
+    gameState = 'won';
+    wonTimer = 0;
+    overlayTitle.textContent = 'VICTORIOUS';
+    overlayMsg.textContent = `You escaped the gaze. ${deaths} petrification${deaths!==1?'s':''} along the way.`;
+    overlayKey.textContent = 'PRESS SPACE TO PLAY AGAIN';
+    overlay.classList.remove('hidden');
+  }
+}
+
+function petrifyPlayer(byMedusa) {
+  if (gameState !== 'playing') return;
+  gameState = 'petrified';
+  deaths++;
+  deathCountEl.textContent = `PETRIFICATIONS: ${deaths}`;
+
+  // Leave statue
+  statues.push({
+    x: player.x, y: player.y,
+    w: player.w, h: player.h,
+    facingRight: player.facingRight,
+    id: deaths,
+  });
+
+  // Flash effect
+  stoneFlash.style.opacity = '1';
+  setTimeout(() => stoneFlash.style.opacity = '0', 300);
+
+  // Spawn stone particles
+  for (let i = 0; i < 20; i++) {
+    particles.push({
+      x: player.x + player.w/2 + (Math.random()-0.5)*20,
+      y: player.y + player.h/2 + (Math.random()-0.5)*20,
+      vx: (Math.random()-0.5)*3,
+      vy: -Math.random()*4,
+      life: 30+Math.random()*20,
+      r: 2+Math.random()*4,
+      color: `hsl(0,0%,${50+Math.random()*30}%)`,
+    });
+  }
+
+  if (byMedusa) {
+    overlayTitle.textContent = '🐍 PETRIFIED';
+    overlayMsg.textContent = `Her eyes met yours. Stone remains — use it wisely.`;
+  } else {
+    overlayTitle.textContent = 'YOU FELL';
+    overlayMsg.textContent = `Your stone lingers where you fell.`;
+  }
+  overlayKey.textContent = 'PRESS SPACE OR CLICK TO RESPAWN';
+  overlay.classList.remove('hidden');
+
+  setTimeout(() => {
+    if (gameState === 'petrified') {
+      // auto-respawn hint already shown
+    }
+  }, 100);
+}
+
+function spawnJumpParticles(p) {
+  for (let i = 0; i < 6; i++) {
+    particles.push({
+      x: p.x + Math.random()*p.w,
+      y: p.y + p.h,
+      vx: (Math.random()-0.5)*2,
+      vy: Math.random()*1,
+      life: 15+Math.random()*10,
+      r: 2,
+      color: '#c9a84c44',
+    });
+  }
+}
+
+function respawn() {
+  if (gameState === 'start' || gameState === 'won') {
+    init();
+  } else if (gameState === 'petrified') {
+    resetLevel();
+  }
+  gameState = 'playing';
+  overlay.classList.add('hidden');
+}
+
+// --- DRAW ---
+function drawBackground() {
+  // Dark atmospheric bg
+  ctx.fillStyle = '#0f0810';
+  ctx.fillRect(0, 0, W, H);
+
+  // Columns / ruins in bg
+  ctx.save();
+  ctx.globalAlpha = 0.15;
+  for (let i = 0; i < 8; i++) {
+    const cx = (i * 110 - (cameraX * 0.3) % 110 + 110) % (W+110) - 20;
+    ctx.fillStyle = '#8a7a6a';
+    ctx.fillRect(cx, 100, 18, H-100);
+    ctx.fillRect(cx-6, 95, 30, 18);
+    ctx.fillRect(cx-6, H-48, 30, 18);
+  }
+  ctx.restore();
+
+  // Stars / dust
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#c9a84c';
+  for (let i = 0; i < 40; i++) {
+    const sx = ((i*173.13 - cameraX*0.1) % W + W) % W;
+    const sy = (i*97.7) % (H*0.6);
+    ctx.beginPath(); ctx.arc(sx, sy, 0.8, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPlatform(pl) {
+  const x = pl.x - cameraX;
+  const y = pl.y;
+  const w = pl.w;
+  const h = pl.h;
+
+  // Base stone
+  ctx.fillStyle = '#3a2e22';
+  ctx.fillRect(x, y, w, h);
+  // Top edge highlight
+  ctx.fillStyle = '#5a4a32';
+  ctx.fillRect(x, y, w, 4);
+  // Crack details
+  ctx.strokeStyle = '#2a2018';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x+10, y+6); ctx.lineTo(x+20, y+20);
+  ctx.moveTo(x+w-15, y+6); ctx.lineTo(x+w-25, y+18);
+  ctx.stroke();
+}
+
+function drawPlayer(p) {
+  const x = Math.floor(p.x - cameraX);
+  const y = Math.floor(p.y);
+  const flip = !p.facingRight;
+
+  ctx.save();
+  if (flip) {
+    ctx.translate(x + p.w, 0);
+    ctx.scale(-1, 1);
+    ctx.translate(-x, 0);
+  }
+
+  // Body — humanoid stick figure style
+  const bx = x, by = y;
+
+  // Tunic
+  ctx.fillStyle = '#c9a84c';
+  ctx.fillRect(bx+6, by+10, 12, 14);
+
+  // Head
+  ctx.fillStyle = '#e8c88c';
+  ctx.beginPath(); ctx.arc(bx+12, by+7, 7, 0, Math.PI*2); ctx.fill();
+
+  // Hair
+  ctx.fillStyle = '#3a2810';
+  ctx.beginPath(); ctx.arc(bx+12, by+4, 7, Math.PI, 0); ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#1a1008';
+  ctx.fillRect(bx+9, by+6, 2, 2);
+  ctx.fillRect(bx+13, by+6, 2, 2);
+
+  // Legs (walk anim)
+  const legSwing = Math.sin(p.walkFrame * Math.PI/2) * 5;
+  ctx.fillStyle = '#7a5a2a';
+  ctx.fillRect(bx+6, by+24, 5, 8 + legSwing);
+  ctx.fillRect(bx+13, by+24, 5, 8 - legSwing);
+
+  // Arms
+  ctx.fillStyle = '#e8c88c';
+  const armSwing = Math.sin(p.walkFrame * Math.PI/2) * 3;
+  ctx.fillRect(bx+2, by+11, 4, 8+armSwing);
+  ctx.fillRect(bx+18, by+11, 4, 8-armSwing);
+
+  ctx.restore();
+}
+
+function drawStatue(s, idx) {
+  const x = Math.floor(s.x - cameraX);
+  const y = Math.floor(s.y);
+  const flip = !s.facingRight;
+
+  // Draw "safe zone" shadow behind statue if any medusa is on patrol nearby
+  for (const m of medusas) {
+    const toPlayer = player.x - m.x;
+    const toStatue = s.x - m.x;
+    // If statue is between medusa and player
+    if (Math.sign(toStatue) === Math.sign(toPlayer) && Math.abs(toStatue) < Math.abs(toPlayer)) {
+      const shadowDir = -Math.sign(toPlayer - toStatue); // shadow goes away from medusa
+      ctx.save();
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = '#00ff88';
+      ctx.fillRect(x + (shadowDir > 0 ? s.w : -60), y - 4, 60, s.h + 8);
+      ctx.restore();
+      break;
+    }
+  }
+
+  ctx.save();
+  if (flip) {
+    ctx.translate(x + s.w, 0);
+    ctx.scale(-1, 1);
+    ctx.translate(-x, 0);
+  }
+
+  // Stone grey version of player
+  ctx.globalAlpha = 0.85;
+
+  const bx = x, by = y;
+
+  // Body
+  ctx.fillStyle = '#8a8878';
+  ctx.fillRect(bx+6, by+10, 12, 14);
+  // Head
+  ctx.fillStyle = '#9a9888';
+  ctx.beginPath(); ctx.arc(bx+12, by+7, 7, 0, Math.PI*2); ctx.fill();
+  // Hair
+  ctx.fillStyle = '#6a6858';
+  ctx.beginPath(); ctx.arc(bx+12, by+4, 7, Math.PI, 0); ctx.fill();
+  // Eyes — hollow stone look
+  ctx.fillStyle = '#4a4838';
+  ctx.fillRect(bx+9, by+6, 2, 2);
+  ctx.fillRect(bx+13, by+6, 2, 2);
+  // Legs
+  ctx.fillStyle = '#7a7868';
+  ctx.fillRect(bx+6, by+24, 5, 8);
+  ctx.fillRect(bx+13, by+24, 5, 8);
+  // Arms
+  ctx.fillStyle = '#9a9888';
+  ctx.fillRect(bx+2, by+11, 4, 8);
+  ctx.fillRect(bx+18, by+11, 4, 8);
+
+  // Cracks overlay
+  ctx.strokeStyle = '#5a5848';
+  ctx.lineWidth = 0.8;
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(bx+10, by+2); ctx.lineTo(bx+14, by+15);
+  ctx.moveTo(bx+8, by+16); ctx.lineTo(bx+16, by+22);
+  ctx.stroke();
+
+  // Number badge
+  ctx.globalAlpha = 0.9;
+  ctx.fillStyle = '#c9a84c';
+  ctx.font = 'bold 8px Cinzel, serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('#'+s.id, bx+12, by-2);
+
+  ctx.restore();
+}
+
+function drawMedusa(m) {
+  const x = Math.floor(m.x - cameraX);
+  const y = Math.floor(m.y);
+  const flip = m.facingRight;
+
+  ctx.save();
+  if (flip) {
+    ctx.translate(x + m.w, 0);
+    ctx.scale(-1, 1);
+    ctx.translate(-x, 0);
+  }
+
+  const bx = x, by = y;
+
+  // Robe / body
+  const robeColor = m.alertTimer > 5 ? '#8b1a1a' : '#2a4a2a';
+  ctx.fillStyle = robeColor;
+  // skirt shape
+  ctx.beginPath();
+  ctx.moveTo(bx+4, by+14);
+  ctx.lineTo(bx, by+m.h);
+  ctx.lineTo(bx+m.w, by+m.h);
+  ctx.lineTo(bx+m.w-4, by+14);
+  ctx.closePath();
+  ctx.fill();
+
+  // Torso
+  ctx.fillStyle = robeColor;
+  ctx.fillRect(bx+6, by+10, 16, 14);
+
+  // Head
+  ctx.fillStyle = '#c8a882';
+  ctx.beginPath(); ctx.arc(bx+14, by+8, 9, 0, Math.PI*2); ctx.fill();
+
+  // Snake hair
+  const snakeColors = ['#2d7a2d','#1a5a1a','#3a8a3a','#145a14'];
+  for (let i = 0; i < 6; i++) {
+    const angle = (i/6)*Math.PI + m.animFrame * 0.3;
+    const sx = bx+14 + Math.cos(angle)*9;
+    const sy = by - 2 + Math.sin(angle)*5;
+    ctx.fillStyle = snakeColors[i%4];
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2.5, 0, Math.PI*2);
+    ctx.fill();
+    // snake tongue
+    if (m.animFrame === 1 && i%2===0) {
+      ctx.strokeStyle = '#ff4444';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy+2);
+      ctx.lineTo(sx-2, sy+5);
+      ctx.moveTo(sx, sy+2);
+      ctx.lineTo(sx+2, sy+5);
+      ctx.stroke();
+    }
+  }
+
+  // Eyes — glowing when alert
+  const eyeGlow = m.alertTimer > 5;
+  ctx.fillStyle = eyeGlow ? '#ffee00' : '#ffd700';
+  if (eyeGlow) {
+    ctx.shadowBlur = 15; ctx.shadowColor = '#ffee00';
+  }
+  ctx.beginPath(); ctx.arc(bx+10, by+8, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(bx+18, by+8, 2.5, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Sight cone — always drawn ahead of the medusa (in her look direction)
+  if (m.alertTimer > 0) {
+    ctx.save();
+    ctx.globalAlpha = (m.alertTimer / 90) * 0.35;
+    ctx.fillStyle = '#ffee00';
+    ctx.beginPath();
+    // cone goes LEFT from bx+14 (since we already flip canvas for facing right)
+    ctx.moveTo(bx+14, by+8);
+    ctx.lineTo(bx+14 - m.sightRange, by+8 - 35);
+    ctx.lineTo(bx+14 - m.sightRange, by+8 + 35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function drawGoal() {
+  const g = LEVEL.goal;
+  const x = g.x - cameraX;
+  const pulse = 0.7 + 0.3*Math.sin(Date.now()*0.003);
+
+  ctx.save();
+  ctx.shadowBlur = 20; ctx.shadowColor = '#c9a84c';
+  ctx.fillStyle = `rgba(201,168,76,${pulse*0.3})`;
+  ctx.fillRect(x, g.y, g.w, g.h);
+  ctx.strokeStyle = `rgba(201,168,76,${pulse})`;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, g.y, g.w, g.h);
+
+  // Trophy icon
+  ctx.fillStyle = '#c9a84c';
+  ctx.font = '20px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🏛️', x+g.w/2, g.y+g.h/2+6);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = p.life/50;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x - cameraX, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawHUD() {
+  // Minimap in corner showing statue positions
+  if (statues.length > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#1a1410';
+    ctx.fillRect(W-110, 10, 100, 30);
+    ctx.strokeStyle = '#3a2a1a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(W-110, 10, 100, 30);
+    ctx.fillStyle = '#c9a84c';
+    ctx.font = '8px Cinzel, serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${statues.length} STONE${statues.length!==1?'S':''}`, W-105, 22);
+
+    // dots for statues
+    for (const s of statues) {
+      const mx = (s.x / 800) * 90;
+      ctx.fillStyle = '#888';
+      ctx.beginPath(); ctx.arc(W-105+mx, 33, 3, 0, Math.PI*2); ctx.fill();
+    }
+    // player dot
+    const px = (player.x / 800) * 90;
+    ctx.fillStyle = '#c9a84c';
+    ctx.beginPath(); ctx.arc(W-105+px, 33, 3, 0, Math.PI*2); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function draw() {
+  drawBackground();
+
+  // Platforms
+  for (const pl of LEVEL.platforms) drawPlatform(pl);
+
+  // Goal
+  drawGoal();
+
+  // Statues
+  for (let i = 0; i < statues.length; i++) drawStatue(statues[i], i+1);
+
+  // Medusas
+  for (const m of medusas) drawMedusa(m);
+
+  // Player
+  if (gameState === 'playing') drawPlayer(player);
+
+  // Particles
+  drawParticles();
+
+  drawHUD();
+}
+
+// --- LOOP ---
+let last = 0;
+function loop(ts) {
+  const dt = ts - last; last = ts;
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// --- INPUT ---
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (gameState !== 'playing') respawn();
+  }
+});
+document.addEventListener('keyup', e => { keys[e.key] = false; });
+canvas.addEventListener('click', () => {
+  if (gameState !== 'playing') respawn();
+});
+
+// Start
+overlay.classList.remove('hidden');
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
