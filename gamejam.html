@@ -142,7 +142,7 @@
 <div id="ui">
   <span id="deathCount">PETRIFICATIONS: 0</span>
   <span id="hint">Your stone body persists — climb upon your past failures</span>
-  <span id="keys">← → MOVE &nbsp;|&nbsp; SPACE JUMP</span>
+  <span id="keys">← → MOVE &nbsp;|&nbsp; SPACE JUMP &nbsp;|&nbsp; TAB SPRINT</span>
 </div>
 
 <script>
@@ -301,8 +301,9 @@ function update() {
   cameraX += (targetCam - cameraX) * 0.1;
   cameraX = Math.max(0, Math.min(cameraX, 920));
 
-  // Player input — slower, more deliberate movement
-  const speed = 1.6;
+  // Player input
+  const isSprinting = keys['Tab'] || keys['Shift'];
+  const speed = isSprinting ? 4.5 : 2.5;
   if (keys['ArrowLeft'] || keys['a']) {
     player.vx = -speed;
     player.facingRight = false;
@@ -328,7 +329,8 @@ function update() {
   // Walk anim
   if (player.vx !== 0 && player.onGround) {
     player.walkTimer++;
-    if (player.walkTimer > 8) { player.walkFrame = (player.walkFrame+1)%4; player.walkTimer=0; }
+    const animSpeed = (keys['Tab'] || keys['Shift']) ? 4 : 6;
+    if (player.walkTimer > animSpeed) { player.walkFrame = (player.walkFrame+1)%4; player.walkTimer=0; }
   } else if (player.onGround) {
     player.walkFrame = 0;
   }
@@ -382,10 +384,8 @@ function update() {
     }
 
     if (sameDir && dist < m.sightRange && dy < 60 && !statuBlocksSight) {
-      m.alertTimer = Math.min(m.alertTimer + 1, 60);
-      if (m.alertTimer > 45) {
-        petrifyPlayer(true);
-      }
+      m.alertTimer = 60; // max for visual glow
+      petrifyPlayer(true);
     } else {
       m.alertTimer = Math.max(m.alertTimer - 3, 0);
     }
@@ -852,9 +852,9 @@ function loop(ts) {
 // --- INPUT ---
 document.addEventListener('keydown', e => {
   keys[e.key] = true;
-  if (e.key === ' ') {
+  if (e.key === ' ' || e.key === 'Tab') {
     e.preventDefault();
-    if (gameState !== 'playing') respawn();
+    if (e.key === ' ' && gameState !== 'playing') respawn();
   }
 });
 document.addEventListener('keyup', e => { keys[e.key] = false; });
