@@ -1,0 +1,1547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>STEPPING STONES</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#f5f2e8; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; font-family:'Cinzel',serif; overflow:hidden; }
+  #homeScreen { display:flex; flex-direction:column; align-items:center; width:800px; }
+  #homeScreen.hidden { display:none; }
+  #homeLogo { font-size:3.6rem; font-weight:900; letter-spacing:0.35em; color:#c9a84c; text-shadow:0 0 40px #c9a84c99,0 0 80px #c9a84c33; margin-bottom:6px; }
+  #homeTagline { font-family:'Crimson Text',serif; font-style:italic; color:#6a5030; font-size:1rem; letter-spacing:0.25em; margin-bottom:48px; }
+  #levelGrid { display:grid; grid-template-columns:repeat(5,1fr); gap:16px; width:100%; padding:0 10px; margin-bottom:32px; }
+  .levelCard { aspect-ratio:1; border:2px solid #2a1e10; background:#0f0a08; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; transition:border-color 0.2s,box-shadow 0.2s; user-select:none; }
+  .levelCard.unlocked { border-color:#3a2a14; cursor:pointer; }
+  .levelCard.unlocked:hover { border-color:#c9a84c; box-shadow:0 0 20px #c9a84c33; }
+  .levelCard.locked { opacity:0.32; cursor:default; }
+  .levelCard.completed { border-color:#4a6a2a; background:#0a100a; cursor:pointer; }
+  .levelCard.completed:hover { border-color:#8ab84c; box-shadow:0 0 20px #6a9a3a33; }
+  .levelCard.completed::after { content:'✓'; position:absolute; top:6px; right:8px; color:#6a9a3a; font-size:0.7rem; }
+  .levelNum { font-size:1.8rem; font-weight:900; color:#c9a84c; line-height:1; }
+  .levelCard.locked .levelNum { color:#3a2a14; }
+  .levelCard.completed .levelNum { color:#8ab84c; }
+  .levelLabel { font-family:'Crimson Text',serif; font-style:italic; font-size:0.65rem; color:#5a4020; margin-top:4px; letter-spacing:0.1em; text-align:center; padding:0 4px; }
+  .levelCard.unlocked .levelLabel { color:#7a6040; }
+  .levelCard.completed .levelLabel { color:#5a7a30; }
+  #homeFooter { font-family:'Crimson Text',serif; font-style:italic; color:#2a1a0a; font-size:0.8rem; letter-spacing:0.15em; }
+  #gameScreen { display:flex; flex-direction:column; align-items:center; }
+  #gameScreen.hidden { display:none; }
+  #gameHeader { display:flex; justify-content:space-between; align-items:center; width:800px; padding:6px 12px; color:#c9a84c; font-size:0.72rem; letter-spacing:0.15em; }
+  #backBtn { cursor:pointer; color:#5a3a18; font-size:0.7rem; letter-spacing:0.15em; transition:color 0.15s; border:none; background:none; font-family:inherit; }
+  #backBtn:hover { color:#c9a84c; }
+  #gameWrapper { position:relative; border:2px solid #3a2a1a; box-shadow:0 0 60px #c9a84c22; }
+  canvas { display:block; background:#0f0810; }
+  #overlay { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#c9a84c; transition:opacity 0.4s; cursor:pointer; }
+  #overlay.hidden { opacity:0; pointer-events:none; }
+  #overlayTitle { font-size:2.4rem; font-weight:900; letter-spacing:0.3em; text-shadow:0 0 30px #c9a84c; margin-bottom:10px; }
+  #overlayMsg { font-family:'Crimson Text',serif; font-style:italic; font-size:1.05rem; color:#d4b896; margin-bottom:24px; max-width:520px; text-align:center; line-height:1.8; background:rgba(0,0,0,0.3); padding:16px 24px; border-radius:4px; border:1px solid #3a2a1a; }
+  #overlayKey { font-size:0.72rem; color:#5a4a2a; letter-spacing:0.2em; animation:pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+  #stoneFlash { position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(ellipse,#aaaaaa88 0%,transparent 70%); opacity:0; pointer-events:none; transition:opacity 0.1s; }
+  #shieldFlash { position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(ellipse,#88ccff66 0%,transparent 70%); opacity:0; pointer-events:none; transition:opacity 0.15s; }
+  #swordFlash { position:absolute; top:0; left:0; width:100%; height:100%; background:radial-gradient(ellipse,#ffaa4444 0%,transparent 70%); opacity:0; pointer-events:none; transition:opacity 0.1s; }
+  #gameFooter { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; width:800px; padding:7px 14px; background:#f5f2e8; border-top:1px solid #d4c8b0; color:#c9a84c; font-size:0.72rem; letter-spacing:0.13em; }
+  #deathCount { color:#8b3a3a; }
+  #controlsHint { color:#2a1a0a; font-size:0.65rem; letter-spacing:0.1em; }
+  #hintBar { color:#5a4a2a; font-family:'Crimson Text',serif; font-style:italic; font-size:0.78rem; flex:1; text-align:center; }
+  .key { display:inline-block; background:#f8f8f8; border:2px solid #3a2a1a; border-radius:4px; padding:2px 6px; font-size:0.6rem; font-weight:700; color:#2a1a0a; box-shadow:0 2px 0 #2a1a1a; margin:0 2px; min-width:20px; text-align:center; }
+  .key.wide { min-width:50px; }
+  .devBtn { border:1px solid #5a4a2a; background:#1a120c; color:#c9a84c; font-family:'Cinzel',serif; font-size:0.62rem; letter-spacing:0.1em; padding:4px 8px; cursor:pointer; }
+  .devBtn:hover { background:#2a1a10; }
+  #devControls { display:inline-flex; align-items:center; gap:10px; color:#b99754; font-size:0.62rem; letter-spacing:0.08em; }
+  .devControl { display:inline-flex; align-items:center; gap:5px; }
+  .devControl input[type="range"] { width:80px; accent-color:#c9a84c; }
+</style>
+</head>
+<body>
+
+<div id="homeScreen">
+  <div id="homeLogo">STEPPING STONES</div>
+  <div id="homeTagline">a medusa platformer — your stone remains</div>
+  <div id="levelGrid"></div>
+  <div id="homeFooter"><span class="key">←</span> <span class="key">→</span> move &nbsp;|&nbsp; <span class="key wide">SPACE</span> jump &nbsp;|&nbsp; <span class="key">F</span> shield &nbsp;|&nbsp; <span class="key">E</span> sword &nbsp;|&nbsp; <span class="key">R</span> reset &nbsp;|&nbsp; <span class="key">ESC</span> levels</div>
+</div>
+
+<div id="gameScreen" class="hidden">
+  <div id="gameHeader">
+    <button id="backBtn" onclick="goHome()">← LEVELS</button>
+    <span id="levelTitle">LEVEL 1</span>
+    <span id="levelTimerDisplay">TIME: 0:00</span>
+    <span id="deathCount">DEATHS: 0</span>
+  </div>
+  <div id="gameWrapper">
+    <canvas id="c" width="800" height="480"></canvas>
+    <div id="overlay" onclick="if(gameState!=='home')respawn()">
+      <div id="overlayTitle">STEPPING STONES</div>
+      <div id="overlayMsg">Her eyes met yours.</div>
+      <div id="overlayKey">PRESS SPACE OR CLICK TO BEGIN</div>
+    </div>
+    <div id="stoneFlash"></div>
+    <div id="shieldFlash"></div>
+    <div id="swordFlash"></div>
+  </div>
+  <div id="gameFooter">
+    <span id="controlsHint"><span class="key">←</span> <span class="key">→</span> MOVE &nbsp;|&nbsp; <span class="key wide">SPACE</span> / <span class="key">↑</span> JUMP &nbsp;|&nbsp; <span class="key">R</span> RESET</span>
+    <span id="hintBar"></span>
+    <div id="devControls">
+      <button class="devBtn" id="wipeBtn">RESET LEVEL</button>
+      <button class="devBtn" id="soundBtn">♪ ON</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  LEVEL DATA
+// ═══════════════════════════════════════════════════════════
+const LEVELS = [
+
+  // ── LEVEL 1: THE BRIDGE ─────────────────────────────────
+  {
+    num:1, name:'THE BRIDGE',
+    platforms:[
+      {x:0,   y:448, w:260, h:32},
+      {x:260, y:360, w:220, h:16},
+      {x:260, y:448, w:220, h:32},
+      {x:480, y:448, w:180, h:32},
+      {x:660, y:448, w:260, h:32},
+      {x:710, y:316, w:110, h:16},
+      {x:740, y:210, w:90,  h:16},
+      {x:0,   y:0,   w:960, h:8},
+    ],
+    medusas:[
+      {spawnX:340,spawnY:408,left:265,right:475,stationary:false,chaser:false},
+      {spawnX:750,spawnY:408,left:665,right:910,stationary:false,chaser:false},
+    ],
+    shields:[], swords:[],
+    playerStart:{x:30,y:400}, goal:{x:745,y:178,w:80,h:32},
+    camMin:0, camMax:960,
+    hints:[
+      {maxX:240,  text:'A medusa patrols below — the bridge keeps you out of her sight'},
+      {maxX:490,  text:'Stay on the bridge — the pit will catch her eye'},
+      {maxX:660,  text:'That platform looks far too high to reach...'},
+      {maxX:9999, text:'Let her see you — your stone self will remain as a stepping stone'},
+    ],
+    intro:'CONTROLS: ← → to move, SPACE to jump, R to restart\n\nMECHANIC: When Medusa sees you, you turn to stone — but your statue remains. Use your failures as stepping stones.',
+  },
+
+  // ── LEVEL 2: THE MIRROR ─────────────────────────────────
+  {
+    num:2, name:'THE MIRROR',
+    platforms:[
+      {x:0,   y:448, w:200, h:32},
+      {x:200, y:448, w:380, h:32},
+      {x:220, y:340, w:120, h:16},
+      {x:400, y:390, w:60,  h:16},
+      {x:460, y:330, w:130, h:16},
+      {x:590, y:448, w:180, h:32},
+      {x:620, y:360, w:90,  h:16},
+      {x:770, y:448, w:430, h:32},
+      {x:1200,y:448, w:400, h:32},
+      {x:1370,y:368, w:100, h:16},
+      {x:1430,y:288, w:100, h:16},
+      {x:0,   y:0,   w:1650,h:8},
+    ],
+    medusas:[
+      {spawnX:290,spawnY:408,left:205,right:410,stationary:false,chaser:false},
+      {spawnX:510,spawnY:408,left:415,right:580,stationary:false,chaser:false},
+      {spawnX:1310,spawnY:408,left:1310,right:1310,stationary:true,chaser:false,forceLookDir:-1},
+    ],
+    shields:[{x:645,y:328,w:20,h:28,collected:false}], swords:[],
+    playerStart:{x:30,y:400}, goal:{x:1435,y:256,w:90,h:32},
+    camMin:0, camMax:1560,
+    hints:[
+      {maxX:200,  text:'Two medusas guard the path — stay above their line of sight'},
+      {maxX:600,  text:'Something glints on the pedestal ahead...'},
+      {maxX:800,  text:'You have the mirror-shield. One use. Save it.'},
+      {maxX:1220, text:'A guardian stands ahead. She does not move. She does not blink.'},
+      {maxX:9999, text:'Raise your shield — F — and let her gaze find its own reflection'},
+    ],
+    intro:'NEW ITEM: Mirror Shield — Press F to raise it\n\nReflect her gaze back at her. One use only.',
+  },
+
+  // ── LEVEL 3: THE HUNT ───────────────────────────────────
+  {
+    num:3, name:'THE HUNT',
+    platforms:[
+      {x:0,   y:448, w:1000,h:32},
+      {x:336, y:348, w:88,  h:16},
+      {x:0,   y:0,   w:1000,h:8},
+    ],
+    medusas:[
+      {spawnX:30,  spawnY:408,left:0,   right:1000,stationary:false,chaser:true,forceLookDir:1},
+      {spawnX:930, spawnY:408,left:0,   right:1000,stationary:false,chaser:true,forceLookDir:-1},
+    ],
+    shields:[], swords:[],
+    playerStart:{x:460,y:400}, goal:{x:880,y:416,w:80,h:32},
+    camMin:0, camMax:1000,
+    hints:[{maxX:9999,text:'They hunt by presence — lure them together, then rise above'}],
+    intro:'NEW ENEMY: Chaser Medusas — They sense you and pursue\n\nLure both hunters to face each other. Their gazes will turn each other to stone.',
+  },
+
+  // ── LEVEL 4: THE BLADE ──────────────────────────────────
+  {
+    num:4, name:'THE BLADE',
+    platforms:[
+      {x:0,   y:448, w:960, h:32},
+      {x:10,  y:370, w:220, h:16},
+      {x:180, y:290, w:220, h:16},
+      {x:50,  y:200, w:200, h:16},
+      {x:0,   y:0,   w:960, h:8},
+    ],
+    medusas:[
+      {spawnX:40,  spawnY:338, left:12,  right:202, stationary:false, chaser:false},
+      {spawnX:260, spawnY:258, left:182, right:372, stationary:false, chaser:false},
+      {spawnX:680, spawnY:408, left:540, right:820, stationary:false, chaser:false},
+    ],
+    swords:[{x:120, y:168, w:20, h:32, collected:false}],
+    shields:[],
+    playerStart:{x:20,y:400},
+    goal:{x:840,y:416,w:80,h:32},
+    camMin:0, camMax:960,
+    hints:[
+      {maxX:420,  text:'Climb the tower — a blade waits at the top'},
+      {maxX:500,  text:'Sword in hand. The guardian ahead cannot be avoided — only ended.'},
+      {maxX:9999, text:'Wait for her back to turn — then press E'},
+    ],
+    intro:'A blade among the ruins. Not everything must be endured.',
+  },
+
+  // ── LEVEL 5: THE PRESSURE ───────────────────────────────
+  {
+    num:5, name:'THE PRESSURE',
+    platforms:[
+      {x:-800, y:0,   w:2600, h:8},
+      {x:-10,  y:416, w:260,  h:64},
+      {x:370,  y:416, w:80,   h:64},
+      {x:600,  y:416, w:130,  h:64},
+      {x:370,  y:540, w:230,  h:20},
+      {x:720,  y:416, w:500,  h:64},
+      {x:-270, y:416, w:270,  h:64},
+      {x:-360, y:318, w:140,  h:16},
+      {x:-620, y:416, w:260,  h:64},
+      {x:-500, y:328, w:100,  h:16},
+      {x:-420, y:248, w:100,  h:16},
+      {x:250,  y:472, w:120,  h:28},
+    ],
+
+    lavaPits:[
+      {x:250, y:456, w:120, h:44},
+    ],
+
+    pressurePlates:[
+      {id:'pp1', x:-295, y:196, w:36, h:8, activated:false, triggerId:'swordLift'},
+      {id:'pp2', x:-560, y:408, w:36, h:8, activated:false, triggerId:'topPlatLeft'},
+    ],
+
+    movablePlatforms:[
+      {id:'topPlatLeft', x:-330, y:204, w:110, h:16,
+       restY:204, activeY:322, moving:false, currentY:204},
+      {id:'swordLift', x:370, y:524, w:360, h:16,
+       restY:524, activeY:416, moving:false, currentY:524},
+    ],
+
+    boxes:[
+      {id:'box1', x:-540, y:380, w:28, h:28, vx:0, vy:0, spawnX:-540, spawnY:380},
+    ],
+
+    medusas:[
+      {spawnX:-310, spawnY:286, left:-355, right:-230, stationary:false, chaser:false},
+      {spawnX:500,  spawnY:492, left:372,  right:722,  stationary:false, chaser:false, liftId:'swordLift'},
+      {spawnX:860,  spawnY:376, left:722,  right:1150, stationary:false, chaser:true},
+    ],
+
+    shields:[],
+    swords:[{x:510, y:492, w:20, h:32, collected:false}],
+
+    playerStart:{x:60, y:370},
+    goal:{x:1030, y:376, w:80, h:40},
+    camMin:-700, camMax:1200,
+
+    hints:[
+      {maxX:-330, text:'A pressure plate — but it needs weight to stay down'},
+      {maxX:-100, text:'Push the box further left to lower the top platform'},
+      {maxX:200,  text:'The lava is too wide — your stone self can bridge it'},
+      {maxX:420,  text:'A pit below — the medusa and blade are out of reach for now'},
+      {maxX:9999, text:'Lure the last guardian into the lava'},
+    ],
+
+    intro:'Stone endures. Weight speaks. The pit remembers.',
+  },
+];
+
+// More levels coming soon!
+
+// ═══════════════════════════════════════════════════════════
+//  GLOBAL STATE
+// ═══════════════════════════════════════════════════════════
+const completed=new Set();
+const levelStats={}; // {levelNum: {bestTime, bestDeaths}}
+let gameState='home', currentLevelNum=1, currentLevel=null;
+let deaths=0, statues=[], medusas=[], particles=[], petrifiedMedusas=[], shields=[], swords=[], killedMedusas=[];
+let boxes=[], pressurePlates=[], movablePlatforms=[], deadMedusaSpawns=new Set();
+let player, keys={}, cameraX=0;
+let soundEnabled=true;
+let SPEED=1.8, GRAVITY=0.45;
+let MEDUSA_SPEED=0.67, CHASER_SPEED=0.84;
+let totalGameTimer=0, levelStartTime=0, levelTimer=0;
+let coyoteTime=0.1, jumpBufferTime=0.1; // For floaty jump feel
+let swordSwipeTimer=0, swordSwipeDir=1; // Sword swipe animation
+
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const overlay=document.getElementById('overlay');
+const overlayTitle=document.getElementById('overlayTitle');
+const overlayMsg=document.getElementById('overlayMsg');
+const overlayKey=document.getElementById('overlayKey');
+const stoneFlash=document.getElementById('stoneFlash');
+const shieldFlash=document.getElementById('shieldFlash');
+const swordFlash=document.getElementById('swordFlash');
+const deathCountEl=document.getElementById('deathCount');
+const hintBar=document.getElementById('hintBar');
+const W=800, H=480;
+
+// Dev controls
+document.getElementById('wipeBtn').addEventListener('click',()=>{
+  // Full reset - same as restarting the level
+  deaths=0;
+  deathCountEl.textContent='DEATHS: 0';
+  statues=[];
+  levelStartTime=Date.now();
+  resetLevel();
+});
+document.getElementById('soundBtn').addEventListener('click',()=>{
+  soundEnabled=!soundEnabled;
+  document.getElementById('soundBtn').textContent=soundEnabled?'♪ ON':'♪ OFF';
+});
+
+// ═══════════════════════════════════════════════════════════
+//  AUDIO
+// ═══════════════════════════════════════════════════════════
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx){
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return null;
+    audioCtx=new Ctx();
+  }
+  return audioCtx;
+}
+function playSound(fn){
+  if(!soundEnabled) return;
+  const ac=ensureAudio(); if(!ac) return;
+  if(ac.state==='running'){fn(ac);}
+  else{ac.resume().then(()=>{if(ac.state==='running')fn(ac);});}
+}
+function resumeAudio(){
+  const ac=ensureAudio(); if(!ac) return;
+  if(ac.state!=='running') ac.resume();
+}
+
+function sndPetrify() {
+  if (!soundEnabled) return;
+  const audio = new Audio('newstonenoise.mp3'); // Ensure the MP3 file is in the same directory
+  audio.playbackRate = 0.75; // Adjust playback rate for slower sound
+  audio.play().catch((error) => console.error('Audio playback failed:', error));
+}
+
+function sndJump(ac){
+  const now=ac.currentTime;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type='triangle'; o.frequency.setValueAtTime(440,now); o.frequency.exponentialRampToValueAtTime(880,now+0.1);
+  g.gain.setValueAtTime(0.3,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.12);
+  o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+0.13);
+  const bsz=ac.sampleRate*0.08, buf=ac.createBuffer(1,bsz,ac.sampleRate);
+  const d=buf.getChannelData(0); for(let i=0;i<bsz;i++) d[i]=(Math.random()*2-1)*(1-i/bsz)*0.5;
+  const ns=ac.createBufferSource(),ng=ac.createGain(),nf=ac.createBiquadFilter();
+  ns.buffer=buf; nf.type='highpass'; nf.frequency.value=2000;
+  ng.gain.setValueAtTime(0.15,now); ng.gain.exponentialRampToValueAtTime(0.001,now+0.08);
+  ns.connect(nf); nf.connect(ng); ng.connect(ac.destination); ns.start(now); ns.stop(now+0.08);
+}
+
+function sndLand(ac){
+  const now=ac.currentTime;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(150,now); o.frequency.linearRampToValueAtTime(60,now+0.1);
+  g.gain.setValueAtTime(0.25,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.1);
+  o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+0.11);
+  const bsz=ac.sampleRate*0.06, buf=ac.createBuffer(1,bsz,ac.sampleRate);
+  const d=buf.getChannelData(0); for(let i=0;i<bsz;i++) d[i]=(Math.random()*2-1)*(1-i/bsz);
+  const ns=ac.createBufferSource(),ng=ac.createGain(),nf=ac.createBiquadFilter();
+  ns.buffer=buf; nf.type='lowpass'; nf.frequency.value=600;
+  ng.gain.setValueAtTime(0.1,now); ng.gain.exponentialRampToValueAtTime(0.001,now+0.06);
+  ns.connect(nf); nf.connect(ng); ng.connect(ac.destination); ns.start(now); ns.stop(now+0.06);
+}
+
+function sndStep(ac){
+  const now=ac.currentTime, pitch=200+Math.random()*80;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(pitch,now); o.frequency.linearRampToValueAtTime(pitch*0.5,now+0.04);
+  g.gain.setValueAtTime(0.07,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.05);
+  o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+0.06);
+}
+
+function sndRespawn(ac){
+  const now=ac.currentTime;
+  for(let i=0;i<3;i++){
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.type=i===0?'sine':'triangle';
+    const bf=300+i*200;
+    o.frequency.setValueAtTime(bf,now+i*0.05); o.frequency.exponentialRampToValueAtTime(bf*2,now+0.2+i*0.05);
+    g.gain.setValueAtTime(0.15-i*0.03,now+i*0.05); g.gain.exponentialRampToValueAtTime(0.001,now+0.25+i*0.05);
+    o.connect(g); g.connect(ac.destination); o.start(now+i*0.05); o.stop(now+0.3+i*0.05);
+  }
+}
+
+function sndWin(ac){
+  const now=ac.currentTime;
+  [523,659,784,1047].forEach((freq,i)=>{
+    const o=ac.createOscillator(),g=ac.createGain();
+    o.type='triangle'; const t=now+i*0.12;
+    o.frequency.setValueAtTime(freq,t);
+    g.gain.setValueAtTime(0.3,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+0.36);
+  });
+  const pad=ac.createOscillator(),pg=ac.createGain();
+  pad.type='sine'; pad.frequency.setValueAtTime(262,now);
+  pg.gain.setValueAtTime(0.15,now); pg.gain.exponentialRampToValueAtTime(0.001,now+1.0);
+  pad.connect(pg); pg.connect(ac.destination); pad.start(now); pad.stop(now+1.01);
+}
+
+function sndAlert(ac){
+  const now=ac.currentTime;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(180,now); o.frequency.linearRampToValueAtTime(120,now+0.2);
+  g.gain.setValueAtTime(0.08,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+  o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+0.21);
+}
+
+function sndShield(ac){
+  const now=ac.currentTime;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(800,now); o.frequency.exponentialRampToValueAtTime(1600,now+0.15);
+  g.gain.setValueAtTime(0.3,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.2);
+  o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+0.21);
+}
+
+function sndSword(ac){
+  const now=ac.currentTime;
+  const o=ac.createOscillator(),g=ac.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(300,now); o.frequency.linearRampToValueAtTime(80,now+0.25);
+  g.gain.setValueAtTime(0.4,now); g.gain.exponentialRampToValueAtTime(0.001,now+0.25);
+  o.connect(g); g.connect(ac.destination); o.start(now); o.stop(now+0.26);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HOME SCREEN
+// ═══════════════════════════════════════════════════════════
+function buildHomeScreen(){
+  const grid=document.getElementById('levelGrid');
+  grid.innerHTML='';
+  LEVELS.forEach(lv=>{
+    const isDone=completed.has(lv.num);
+    const card=document.createElement('div');
+    card.className='levelCard '+(isDone?'completed':'unlocked');
+    let tag=isDone?'<span style="font-size:0.55rem;color:#5a7a30;letter-spacing:0.1em;">COMPLETED</span>':'';
+    // Add record time if available
+    if(levelStats[lv.num]){
+      const t=levelStats[lv.num].bestTime;
+      const mins=Math.floor(t/60000);
+      const secs=Math.floor((t%60000)/1000);
+      const tenths=Math.floor((t%1000)/100);
+      tag+=`<span style="font-size:0.5rem;color:#c9a84c;letter-spacing:0.05em;display:block;margin-top:2px;">BEST: ${mins}:${secs.toString().padStart(2,'0')}.${tenths}</span>`;
+    }
+    card.innerHTML=`<div class="levelNum">${lv.num}</div><div class="levelLabel">${lv.name}</div>${tag}`;
+    card.onclick=()=>startLevel(lv.num);
+    grid.appendChild(card);
+  });
+  // Add "more coming soon" text below levels
+  const comingSoon=document.createElement('div');
+  comingSoon.style.cssText='grid-column:1/-1;text-align:center;padding:1rem 0;color:#8b7355;font-size:0.7rem;letter-spacing:0.15em;opacity:0.7;';
+  comingSoon.textContent='MORE LEVELS COMING SOON';
+  grid.appendChild(comingSoon);
+}
+function goHome(){
+  gameState='home';
+  document.getElementById('gameScreen').classList.add('hidden');
+  document.getElementById('homeScreen').classList.remove('hidden');
+  buildHomeScreen();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LEVEL START / RESET
+// ═══════════════════════════════════════════════════════════
+function startLevel(num){
+  currentLevelNum=num; currentLevel=LEVELS[num-1];
+  deaths=0; statues=[]; killedMedusas=[]; cameraX=0;
+  deathCountEl.textContent='DEATHS: 0';
+  document.getElementById('levelTitle').textContent=`LEVEL ${num} — ${currentLevel.name}`;
+  resetLevel();
+  document.getElementById('homeScreen').classList.add('hidden');
+  document.getElementById('gameScreen').classList.remove('hidden');
+  overlayTitle.textContent=`LEVEL ${num}: ${currentLevel.name}`;
+  // Format intro text with line breaks
+  const introText=currentLevel.intro||'Use the darkness. Use your failures.';
+  overlayMsg.innerHTML=introText.replace(/\n/g,'<br>');
+  overlayKey.textContent='PRESS SPACE OR CLICK TO BEGIN';
+  overlay.classList.remove('hidden');
+  gameState='start';
+  levelStartTime=Date.now();
+}
+
+function resetLevel(){
+  player={
+    x:currentLevel.playerStart.x, y:currentLevel.playerStart.y,
+    w:24, h:32, vx:0, vy:0, onGround:false, wasInAir:false,
+    facingRight:true, walkFrame:0, walkTimer:0, walkSoundTimer:0,
+    hasShield:false, shieldRaised:false, hasSword:false,
+  };
+  medusas=currentLevel.medusas.map(cfg=>({
+    x:cfg.spawnX, y:cfg.spawnY, w:28, h:40,
+    vx:cfg.stationary?0:-(cfg.speed!==undefined?cfg.speed:cfg.chaser?CHASER_SPEED:MEDUSA_SPEED),
+    baseSpeed:cfg.speed!==undefined?cfg.speed:cfg.chaser?CHASER_SPEED:MEDUSA_SPEED,
+    left:cfg.left, right:cfg.right,
+    stationary:!!cfg.stationary, chaser:!!cfg.chaser,
+    facingRight:cfg.forceLookDir===1,
+    animFrame:0, animTimer:0,
+    sightRange:140, aggroRange:cfg.chaser?320:0,
+    lookDir:cfg.forceLookDir||-1,
+    alertTimer:0, petrified:false, killed:false,
+    chaseSpeed:0, lingerTimer:0,
+    groundY:cfg.spawnY, vy:0, liftId:cfg.liftId||null,
+    spawnX:cfg.spawnX, spawnY:cfg.spawnY,
+  }));
+  shields=currentLevel.shields.map(s=>({...s,collected:false}));
+  swords=currentLevel.swords.map(s=>({...s,collected:false}));
+  petrifiedMedusas=[];
+  killedMedusas=[];
+  particles=[];
+  // Level 5 extras - create fresh box objects from level definition
+  boxes=[];
+  if(currentLevel.boxes){
+    for(const def of currentLevel.boxes){
+      boxes.push({
+        id:def.id,
+        x:def.spawnX!==undefined?def.spawnX:def.x,
+        y:def.spawnY!==undefined?def.spawnY:def.y,
+        w:def.w,
+        h:def.h,
+        vx:0,
+        vy:0,
+        spawnX:def.spawnX!==undefined?def.spawnX:def.x,
+        spawnY:def.spawnY!==undefined?def.spawnY:def.y
+      });
+    }
+  }
+  movablePlatforms=(currentLevel.movablePlatforms||[]).map(mp=>({...mp,currentY:mp.restY}));
+  pressurePlates=(currentLevel.pressurePlates||[]).map(pp=>({...pp,activated:false}));
+}
+
+// Respawn player after death - keeps boxes, statues, killed medusas, and movable platforms in place
+function respawnPlayer(){
+  player={
+    x:currentLevel.playerStart.x, y:currentLevel.playerStart.y,
+    w:24, h:32, vx:0, vy:0, onGround:false, wasInAir:false,
+    facingRight:true, walkFrame:0, walkTimer:0, walkSoundTimer:0,
+    hasShield:false, shieldRaised:false, hasSword:false,
+  };
+  // Track which medusas were killed before respawn
+  const killedIds=new Set(killedMedusas.map((_,i)=>i));
+  // Reset living medusas to spawn, but keep killed ones dead
+  medusas=currentLevel.medusas.map((cfg,idx)=>{
+    // Check if this medusa was killed (is in killedMedusas array by matching spawn position)
+    const wasKilled=killedMedusas.some(km=>km.spawnX===cfg.spawnX && km.spawnY===cfg.spawnY);
+    if(wasKilled){
+      return {
+        x:cfg.spawnX, y:cfg.spawnY, w:28, h:40, vx:0,
+        baseSpeed:cfg.speed!==undefined?cfg.speed:cfg.chaser?CHASER_SPEED:MEDUSA_SPEED,
+        left:cfg.left, right:cfg.right,
+        stationary:!!cfg.stationary, chaser:!!cfg.chaser,
+        facingRight:cfg.forceLookDir===1,
+        animFrame:0, animTimer:0,
+        sightRange:140, aggroRange:cfg.chaser?320:0,
+        lookDir:cfg.forceLookDir||-1,
+        alertTimer:0, petrified:false, killed:true,
+        chaseSpeed:0, lingerTimer:0,
+        groundY:cfg.spawnY, vy:0, liftId:cfg.liftId||null,
+        spawnX:cfg.spawnX, spawnY:cfg.spawnY,
+      };
+    }
+    return {
+      x:cfg.spawnX, y:cfg.spawnY, w:28, h:40,
+      vx:cfg.stationary?0:-(cfg.speed!==undefined?cfg.speed:cfg.chaser?CHASER_SPEED:MEDUSA_SPEED),
+      baseSpeed:cfg.speed!==undefined?cfg.speed:cfg.chaser?CHASER_SPEED:MEDUSA_SPEED,
+      left:cfg.left, right:cfg.right,
+      stationary:!!cfg.stationary, chaser:!!cfg.chaser,
+      facingRight:cfg.forceLookDir===1,
+      animFrame:0, animTimer:0,
+      sightRange:140, aggroRange:cfg.chaser?320:0,
+      lookDir:cfg.forceLookDir||-1,
+      alertTimer:0, petrified:false, killed:false,
+      chaseSpeed:0, lingerTimer:0,
+      groundY:cfg.spawnY, vy:0, liftId:cfg.liftId||null,
+      spawnX:cfg.spawnX, spawnY:cfg.spawnY,
+    };
+  });
+  // Keep pickups as-is — collected items remain collected after death
+  // (shields and swords do not reappear on respawn)
+  // NOTE: boxes, movablePlatforms, pressurePlates, petrifiedMedusas, killedMedusas all persist!
+  particles=[];
+  // NOTE: boxes, movablePlatforms, pressurePlates, petrifiedMedusas, killedMedusas all persist!
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PHYSICS
+// ═══════════════════════════════════════════════════════════
+function overlap(a,b){
+  return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+}
+
+function resolvePlayer(){
+  const surfaces=[
+    ...currentLevel.platforms,
+    ...movablePlatforms.map(mp=>({x:mp.x,y:mp.currentY,w:mp.w,h:mp.h})),
+    ...statues.map(s=>({x:s.x-2,y:s.y,w:s.w+4,h:s.h})),
+    ...petrifiedMedusas,
+  ];
+  player.onGround=false;
+  player.y+=player.vy;
+  // Include boxes for vertical (landing on top) only — but only if player is above the box
+  const vertSurfaces=[...surfaces,...boxes.filter(b=>player.y+player.h <= b.y+8)];
+  for(const pl of vertSurfaces){
+    if(overlap(player,pl)){
+      if(player.vy>0){player.y=pl.y-player.h;player.onGround=true;player.vy=0;}
+      else           {player.y=pl.y+pl.h;player.vy=0;}
+    }
+  }
+  player.x+=player.vx;
+  // Horizontal: only fixed surfaces, not boxes (push logic handles boxes)
+  for(const pl of surfaces){
+    if(overlap(player,pl)){
+      player.x=player.vx>0?pl.x-player.w:pl.x+pl.w;
+      player.vx=0;
+    }
+  }
+  if(player.x<(currentLevel.camMin!=null?currentLevel.camMin:0)) player.x=(currentLevel.camMin!=null?currentLevel.camMin:0);
+}
+
+function updateStatuePhysics(){
+  for(const s of statues){
+    s.vy=(s.vy||0)+GRAVITY*0.85;
+    if(s.vy>12) s.vy=12;
+    s.y+=s.vy;
+    const surfaces=[...currentLevel.platforms,...movablePlatforms.map(mp=>({x:mp.x,y:mp.currentY,w:mp.w,h:mp.h})),...statues.filter(o=>o!==s)];
+    for(const pl of surfaces){
+      if(overlap(s,pl)&&s.vy>=0&&s.y+s.h>pl.y&&s.y<pl.y+4){
+        s.y=pl.y-s.h; s.vy=0;
+      }
+    }
+    if(s.y>H+200){s.y=H+200;s.vy=0;}
+  }
+}
+
+function groundMedusa(m){
+  const surfaces=[...currentLevel.platforms,...movablePlatforms.map(mp=>({x:mp.x,y:mp.currentY,w:mp.w,h:mp.h})),...statues,...petrifiedMedusas];
+  m.vy=(m.vy||0)+GRAVITY*0.5;
+  if(m.vy>8) m.vy=8;
+  m.y+=m.vy;
+  for(const pl of surfaces){
+    if(overlap({x:m.x,y:m.y,w:m.w,h:m.h},pl)){
+      if(m.vy>=0){m.y=pl.y-m.h;m.vy=0;m.groundY=m.y;}
+      else{m.y=pl.y+pl.h;m.vy=0;}
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SEGMENT vs RECT
+// ═══════════════════════════════════════════════════════════
+function segIntersectsRectGlobal(ax,ay,bx,by,rx,ry,rw,rh){
+  function segSeg(p0x,p0y,p1x,p1y,q0x,q0y,q1x,q1y){
+    const dx1=p1x-p0x,dy1=p1y-p0y,dx2=q1x-q0x,dy2=q1y-q0y;
+    const d=dx1*dy2-dy1*dx2; if(d===0) return false;
+    const t=((q0x-p0x)*dy2-(q0y-p0y)*dx2)/d;
+    const u=((q0x-p0x)*dy1-(q0y-p0y)*dx1)/d;
+    return t>=0&&t<=1&&u>=0&&u<=1;
+  }
+  return segSeg(ax,ay,bx,by,rx,ry,rx+rw,ry)||
+         segSeg(ax,ay,bx,by,rx+rw,ry,rx+rw,ry+rh)||
+         segSeg(ax,ay,bx,by,rx+rw,ry+rh,rx,ry+rh)||
+         segSeg(ax,ay,bx,by,rx,ry+rh,rx,ry);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UPDATE
+// ═══════════════════════════════════════════════════════════
+function update(){
+  if(gameState!=='playing') return;
+
+  cameraX+=(player.x-W/2+player.w/2-cameraX)*0.1;
+  cameraX=Math.max(currentLevel.camMin||0,Math.min(cameraX,currentLevel.camMax));
+
+  // Player movement
+  if(keys['ArrowLeft']||keys['a']){player.vx=-SPEED;player.facingRight=false;}
+  else if(keys['ArrowRight']||keys['d']){player.vx=SPEED;player.facingRight=true;}
+  else{player.vx*=0.7;if(Math.abs(player.vx)<0.1)player.vx=0;}
+
+  // Jump
+  if((keys[' ']||keys['ArrowUp']||keys['w'])&&player.onGround){
+    player.vy=-10;
+    keys[' ']=keys['ArrowUp']=keys['w']=false;
+    for(let i=0;i<5;i++) particles.push({
+      x:player.x+Math.random()*24,y:player.y+32,
+      vx:(Math.random()-.5)*2,vy:Math.random(),life:14+Math.random()*6,r:2,color:'#c9a84c33'
+    });
+    playSound(sndJump);
+  }
+
+  player.shieldRaised=!!(player.hasShield&&(keys['f']||keys['F']));
+  
+  // Standard gravity
+  player.vy=Math.min(player.vy+GRAVITY,14);
+
+  updateStatuePhysics();
+  resolvePlayer();
+
+  // Landing sound
+  if(player.onGround&&player.wasInAir) playSound(sndLand);
+  player.wasInAir=!player.onGround;
+
+  // Walk anim + footsteps
+  if(player.vx!==0&&player.onGround){
+    if(++player.walkTimer>8){player.walkFrame=(player.walkFrame+1)%4;player.walkTimer=0;}
+    if(++player.walkSoundTimer>=12){playSound(sndStep);player.walkSoundTimer=0;}
+  } else if(player.onGround){player.walkFrame=0;player.walkSoundTimer=0;}
+
+  if(player.y>H+60) petrifyPlayer(false);
+
+  // Shield pickup
+  for(const sh of shields){
+    if(!sh.collected&&overlap(player,{x:sh.x,y:sh.y,w:sh.w,h:sh.h})){
+      sh.collected=true; player.hasShield=true;
+      playSound(sndShield);
+      for(let i=0;i<20;i++) particles.push({
+        x:sh.x+10+(Math.random()-.5)*30,y:sh.y+10+(Math.random()-.5)*20,
+        vx:(Math.random()-.5)*4,vy:-Math.random()*5,life:25+Math.random()*15,r:2+Math.random()*2,color:'#88ccff'
+      });
+    }
+  }
+
+  // Sword pickup
+  for(const sw of swords){
+    if(!sw.collected&&overlap(player,{x:sw.x,y:sw.y,w:sw.w,h:sw.h})){
+      sw.collected=true; player.hasSword=true;
+      playSound(sndShield);
+      for(let i=0;i<20;i++) particles.push({
+        x:sw.x+10+(Math.random()-.5)*30,y:sw.y+10+(Math.random()-.5)*20,
+        vx:(Math.random()-.5)*4,vy:-Math.random()*5,life:25+Math.random()*15,r:2+Math.random()*2,color:'#ffcc44'
+      });
+    }
+  }
+
+  // ── Box physics ──
+  for(const b of boxes){
+    const bsurfaces=[...currentLevel.platforms,...movablePlatforms.map(mp=>({x:mp.x,y:mp.currentY,w:mp.w,h:mp.h}))];
+
+    // Gravity
+    b.vy=(b.vy||0)+GRAVITY*0.9;
+    if(b.vy>12) b.vy=12;
+
+    // Player pushes box — set velocity directly based on player movement
+    if(overlap(player,b)){
+      const pdx=(player.x+player.w/2)-(b.x+b.w/2);
+      if(pdx<0 && player.vx>0) b.vx=SPEED*1.1;
+      if(pdx>0 && player.vx<0) b.vx=-SPEED*1.1;
+    }
+
+    b.vx=(b.vx||0)*0.75;
+    if(Math.abs(b.vx)<0.05) b.vx=0;
+
+    // Move horizontally + resolve
+    b.x+=b.vx;
+    for(const pl of bsurfaces){
+      if(overlap(b,pl)){
+        b.x=b.vx>=0?pl.x-b.w:pl.x+pl.w;
+        b.vx=0;
+      }
+    }
+
+    // Move vertically + resolve
+    b.y+=b.vy;
+    for(const pl of bsurfaces){
+      if(overlap(b,pl)){
+        if(b.vy>=0){b.y=pl.y-b.h;b.vy=0;}
+        else{b.y=pl.y+pl.h;b.vy=0;}
+      }
+    }
+
+    if(b.y>H+100) b.dead=true;
+  }
+  boxes=boxes.filter(b=>!b.dead);
+
+  // ── Pressure plates ──
+  for(const pp of pressurePlates){
+    // Anything heavy sitting on it: player, statue, box
+    const ppRect={x:pp.x, y:pp.y, w:pp.w, h:pp.h+4};
+    const wasActive=pp.activated;
+    pp.activated=false;
+    // Player
+    if(overlap({x:player.x,y:player.y+player.h-2,w:player.w,h:4}, ppRect)) pp.activated=true;
+    // Statues
+    for(const s of statues){
+      if(overlap({x:s.x,y:s.y+s.h-2,w:s.w,h:4},ppRect)){pp.activated=true;break;}
+    }
+    // Boxes
+    for(const b of boxes){
+      if(overlap({x:b.x,y:b.y+b.h-2,w:b.w,h:4},ppRect)){pp.activated=true;break;}
+    }
+    // Move target movable platform
+    const mp=movablePlatforms.find(m=>m.id===pp.triggerId);
+    if(mp){
+      const target=pp.activated?mp.activeY:mp.restY;
+      const diff=target-mp.currentY;
+      mp.currentY+=diff*0.08;
+      if(Math.abs(diff)<0.5) mp.currentY=target;
+    }
+  }
+
+  // ── Lava pit kill ──
+  for(const lp of (currentLevel.lavaPits||[])){
+    // Only kill if player's feet are below lava surface AND not standing on a statue
+    const feetY = player.y + player.h;
+    const overLavaX = player.x + player.w > lp.x && player.x < lp.x + lp.w;
+    if(overLavaX && feetY > lp.y + 4 && player.y < lp.y + lp.h){
+      // Check if player is safely on top of a statue
+      let safe = false;
+      for(const s of statues){
+        // Player is standing on this statue if their feet are near the statue top
+        if(player.onGround && Math.abs(feetY - s.y) < 6 && player.x + player.w > s.x && player.x < s.x + s.w){
+          safe = true; break;
+        }
+      }
+      if(!safe) petrifyPlayer(false,'lava');
+    }
+    // Medusas that fall into lava die
+    for(const m of medusas){
+      if(!m.petrified && !m.killed){
+        if(m.x+m.w>lp.x && m.x<lp.x+lp.w && m.y+m.h>lp.y){
+          m.killed=true;
+          deadMedusaSpawns.add(m.spawnX);
+          playSound(sndPetrify);
+          for(let i=0;i<20;i++) particles.push({
+            x:m.x+14+(Math.random()-.5)*28, y:m.y+20+(Math.random()-.5)*20,
+            vx:(Math.random()-.5)*5, vy:-Math.random()*4,
+            life:30+Math.random()*20, r:2+Math.random()*3,
+            color:`hsl(20,80%,${40+Math.random()*30}%)`
+          });
+        }
+      }
+    }
+  }
+
+  // Sword tracks swordLift platform
+  for(const sw of swords){
+    if(!sw.collected){
+      const lift=movablePlatforms.find(m=>m.id==='swordLift');
+      if(lift) sw.y=lift.currentY-32;
+    }
+  }
+
+  // Sword strike - kills medusa (doesn't turn to stone)
+  if((keys['e']||keys['E'])&&player.hasSword){
+    keys['e']=keys['E']=false;
+    // Start swipe animation
+    swordSwipeTimer=12;
+    swordSwipeDir=player.facingRight?1:-1;
+    const RANGE=35; let target=null, best=RANGE;
+    for(const m of medusas){
+      if(m.petrified||m.killed) continue;
+      const dx=m.x+m.w/2-(player.x+player.w/2);
+      const dy=Math.abs(m.y-player.y);
+      const ahead=(player.facingRight&&dx>0)||(!player.facingRight&&dx<0);
+      if(ahead&&Math.abs(dx)<best&&dy<80){target=m;best=Math.abs(dx);}
+    }
+    if(target){
+      swordFlash.style.opacity='1';
+      setTimeout(()=>swordFlash.style.opacity='0',200);
+      playSound(sndSword);
+      // Blood/death particles instead of stone
+      for(let i=0;i<25;i++) particles.push({
+        x:target.x+14+(Math.random()-.5)*28,y:target.y+20+(Math.random()-.5)*20,
+        vx:(Math.random()-.5)*8,vy:-Math.random()*6-2,
+        life:30+Math.random()*20,r:2+Math.random()*3,color:i%3===0?'#8a1a1a':'#aa2222'
+      });
+      killMedusa(target);
+    }
+  }
+  
+  // Update sword swipe animation
+  if(swordSwipeTimer>0) swordSwipeTimer--;
+
+  // ── Medusa update ──
+  for(const m of medusas){
+    if(m.petrified||m.killed) continue;
+    if(++m.animTimer>12){m.animFrame=(m.animFrame+1)%2;m.animTimer=0;}
+
+    // If this medusa rides a lift, keep her patrol bounds locked to the lift platform
+    if(m.liftId){
+      const lift=movablePlatforms.find(p=>p.id===m.liftId);
+      if(lift){
+        m.left=lift.x+2;
+        m.right=lift.x+lift.w-m.w-2;
+        // Pin her directly to the lift surface — don't let gravity fight the rising platform
+        m.y=lift.currentY-m.h;
+        m.groundY=m.y;
+        m.vy=0;
+      }
+    }
+
+    const dx=player.x+player.w/2-(m.x+m.w/2);
+    const dy=Math.abs(player.y-m.y);
+    const dist=Math.abs(dx);
+    const playerAbove=(player.y+player.h)<m.y;
+
+    if(m.chaser){
+      const aggroed=dist<m.aggroRange&&!playerAbove;
+      if(aggroed){m.lingerTimer=90;}
+      else if(m.lingerTimer>0){m.lingerTimer--;}
+      if(aggroed||m.lingerTimer>0){
+        m.chaseSpeed=Math.min(m.chaseSpeed+0.05,m.baseSpeed);
+        const dir=dx>0?1:-1;
+        m.vx=dir*m.chaseSpeed; m.facingRight=(dir>0); m.lookDir=dir;
+      } else {
+        m.chaseSpeed=Math.max(m.chaseSpeed-0.03,0);
+        if(Math.random()<0.01) m.vx=(Math.random()-.5)*0.3;
+        if(m.x<=m.left){m.vx=Math.abs(m.vx)||0.2;m.facingRight=true;m.lookDir=1;}
+        if(m.x+m.w>=m.right){m.vx=-(Math.abs(m.vx)||0.2);m.facingRight=false;m.lookDir=-1;}
+      }
+    }
+
+    if(!m.stationary){
+      m.x+=m.vx;
+      for(const s of [...statues,...petrifiedMedusas]){
+        if(overlap({x:m.x,y:m.y,w:m.w,h:m.h},s)){
+          if(m.vx>0){m.x=s.x-m.w;m.vx=-Math.abs(m.vx);m.facingRight=false;m.lookDir=-1;}
+          else      {m.x=s.x+s.w;m.vx= Math.abs(m.vx);m.facingRight=true; m.lookDir= 1;}
+        }
+      }
+      if(!m.chaser){
+        if(m.x<=m.left) {m.vx= Math.abs(m.vx);m.facingRight=true; m.lookDir= 1;}
+        if(m.x+m.w>=m.right){m.vx=-Math.abs(m.vx);m.facingRight=false;m.lookDir=-1;}
+      }
+    }
+
+    groundMedusa(m);
+    
+    // Player collision with medusa - can't walk through
+    if(overlap(player,{x:m.x,y:m.y,w:m.w,h:m.h})){
+      const pushDir=player.x+player.w/2<m.x+m.w/2?-1:1;
+      player.x=pushDir<0?m.x-player.w:m.x+m.w;
+      player.vx=0;
+      // Medusa turns around if player ends up behind her
+      const playerBehind=(m.lookDir>0&&player.x+player.w/2<m.x+m.w/2)||
+                         (m.lookDir<0&&player.x+player.w/2>m.x+m.w/2);
+      if(playerBehind&&!m.stationary){
+        m.lookDir*=-1;
+        m.facingRight=m.lookDir>0;
+        m.vx=m.lookDir*Math.abs(m.vx||m.baseSpeed);
+      }
+    }
+
+    if(!playerAbove){
+      const inFront=(m.lookDir>0&&dx>0)||(m.lookDir<0&&dx<0);
+      const mx=m.x+m.w/2, my=m.y+m.h/2;
+      const px=player.x+player.w/2, py=player.y+player.h/2;
+      let blocked=false;
+      for(const s of [...statues,...petrifiedMedusas]){
+        if(segIntersectsRectGlobal(mx,my,px,py,s.x,s.y,s.w||28,s.h||40)){blocked=true;break;}
+      }
+      if(!blocked){
+        for(const pl of currentLevel.platforms){
+          if(segIntersectsRectGlobal(mx,my,px,py,pl.x,pl.y,pl.w,pl.h)){blocked=true;break;}
+        }
+      }
+      if(inFront&&dist<m.sightRange&&dy<Math.min(60,dist*0.84)&&!blocked){
+        if(m.alertTimer===0) playSound(sndAlert);
+        m.alertTimer=Math.min(m.alertTimer+1,60);
+        if(m.alertTimer>0){
+          if(player.shieldRaised) reflectGaze(m);
+          else petrifyPlayer(true);
+        }
+      } else {
+        m.alertTimer=Math.max(m.alertTimer-3,0);
+      }
+    } else {
+      m.alertTimer=Math.max(m.alertTimer-3,0);
+    }
+  }
+
+  // Chaser-chaser mutual petrification (level 3)
+  if(currentLevelNum===3){
+    const active=medusas.filter(m=>!m.petrified&&!m.killed&&m.chaser);
+    if(active.length>=2){
+      for(let i=0;i<active.length;i++){
+        for(let j=i+1;j<active.length;j++){
+          const a=active[i],b=active[j];
+          const dxAB=b.x+b.w/2-(a.x+a.w/2);
+          const aSeesB=(a.lookDir>0&&dxAB>0)||(a.lookDir<0&&dxAB<0);
+          const bSeesA=(b.lookDir>0&&-dxAB>0)||(b.lookDir<0&&-dxAB<0);
+          if(aSeesB&&bSeesA&&Math.abs(dxAB)<a.sightRange&&Math.abs(a.y-b.y)<60){
+            petrifyMedusa(a); petrifyMedusa(b);
+          }
+        }
+      }
+    }
+  }
+
+  // Particles
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];p.x+=p.vx;p.y+=p.vy;p.vy+=0.15;p.life--;
+    if(p.life<=0)particles.splice(i,1);
+  }
+
+  // Win
+  if(overlap(player,currentLevel.goal)){
+    completed.add(currentLevelNum); gameState='won';
+    const finalTime=Date.now()-levelStartTime;
+    const mins=Math.floor(finalTime/60000);
+    const secs=Math.floor((finalTime%60000)/1000);
+    // Save best stats
+    if(!levelStats[currentLevelNum]||finalTime<levelStats[currentLevelNum].bestTime){
+      levelStats[currentLevelNum]={bestTime:finalTime,bestDeaths:deaths};
+    }
+    const next=currentLevelNum+1;
+    const hasRealNext=next<=LEVELS.length&&LEVELS[next-1]&&LEVELS[next-1].intro!=='Coming soon.';
+    overlayTitle.textContent='LEVEL CLEAR';
+    
+    // Show total game timer if this is the final level (level 4)
+    if(currentLevelNum===4){
+      const totalMins=Math.floor(totalGameTimer/60000);
+      const totalSecs=Math.floor((totalGameTimer%60000)/1000);
+      overlayMsg.textContent=`GAME COMPLETE!\nTotal Time: ${totalMins}:${totalSecs.toString().padStart(2,'0')}\nTotal Deaths: ${deaths}`;
+    } else {
+      overlayMsg.textContent=`You escaped in ${mins}:${secs.toString().padStart(2,'0')}\n${deaths} death${deaths!==1?'s':''} along the way.`;
+    }
+    
+    overlayKey.textContent=hasRealNext?`PRESS SPACE FOR LEVEL ${next}  —  ESC for levels`:'PRESS SPACE TO RETURN TO LEVELS';
+    overlay.classList.remove('hidden');
+    playSound(sndWin);
+  }
+
+  // Update timer
+  levelTimer=Date.now()-levelStartTime;
+  totalGameTimer=Date.now()-levelStartTime; // Show current level time as global timer
+  const mins=Math.floor(totalGameTimer/60000);
+  const secs=Math.floor((totalGameTimer%60000)/1000);
+  document.getElementById('levelTimerDisplay').textContent=`TIME: ${mins}:${secs.toString().padStart(2,'0')}`;
+
+  // Hints
+  const hints=currentLevel.hints||[];
+  let txt='';
+  if(currentLevelNum===1){
+    for(const h of hints){if(player.x<h.maxX){txt=h.text;break;}}
+    if(statues.length>0&&player.x>=660) txt='Now climb upon your former self';
+  } else if(currentLevelNum===2){
+    for(const h of hints){if(player.x<h.maxX){txt=h.text;break;}}
+    if(player.shieldRaised) txt='Shield raised — her gaze will find its own reflection';
+  } else if(currentLevelNum===3){
+    const allDown=medusas.filter(m=>m.chaser).every(m=>m.petrified);
+    if(allDown) txt='The hunters are stone — the path is yours';
+    else for(const h of hints){if(player.x<h.maxX){txt=h.text;break;}}
+  } else if(currentLevelNum===4){
+    for(const h of hints){if(player.x<h.maxX){txt=h.text;break;}}
+    if(player.hasSword&&player.x>500) txt='Wait for her back to turn — press E';
+  }
+  hintBar.textContent=txt;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PETRIFY HELPERS
+// ═══════════════════════════════════════════════════════════
+function petrifyMedusa(m){
+  if(m.petrified||m.killed) return;
+  m.petrified=true; m.alertTimer=0; m.vx=0;
+  petrifiedMedusas.push({x:m.x,y:m.groundY,w:m.w,h:m.h});
+  stoneFlash.style.opacity='1';
+  setTimeout(()=>stoneFlash.style.opacity='0',280);
+  playSound(sndPetrify);
+  for(let i=0;i<20;i++) particles.push({
+    x:m.x+14+(Math.random()-.5)*30,y:m.groundY+20+(Math.random()-.5)*30,
+    vx:(Math.random()-.5)*4,vy:-Math.random()*5,
+    life:35+Math.random()*20,r:2+Math.random()*4,
+    color:`hsl(${Math.random()*30},10%,${45+Math.random()*35}%)`
+  });
+}
+
+function killMedusa(m){
+  if(m.petrified||m.killed) return;
+  m.killed=true; m.alertTimer=0; m.vx=0;
+  killedMedusas.push({x:m.x,y:m.groundY,w:m.w,h:m.h,fadeTimer:60,spawnX:m.spawnX,spawnY:m.spawnY});
+  // No stone flash for kills - different effect
+  swordFlash.style.opacity='1';
+  setTimeout(()=>swordFlash.style.opacity='0',150);
+}
+
+function reflectGaze(m){
+  player.shieldRaised=false;
+  shieldFlash.style.opacity='1';
+  setTimeout(()=>shieldFlash.style.opacity='0',350);
+  playSound(sndShield);
+  for(let i=0;i<12;i++) particles.push({
+    x:player.x+12+(Math.random()-.5)*20,y:player.y+16+(Math.random()-.5)*20,
+    vx:(Math.random()-.5)*3,vy:-Math.random()*4,
+    life:20+Math.random()*15,r:1.5+Math.random()*2,color:'#88ccff'
+  });
+  petrifyMedusa(m);
+}
+
+function petrifyPlayer(byMedusa, cause){
+  if(gameState!=='playing') return;
+  gameState='petrified'; deaths++;
+  deathCountEl.textContent=`DEATHS: ${deaths}`;
+  // Only leave statue on medusa death
+  if(byMedusa){
+    statues.push({x:player.x,y:player.y,w:player.w,h:player.h,facingRight:player.facingRight,id:deaths,vy:Math.max(player.vy,0)});
+  }
+  stoneFlash.style.opacity='1';
+  setTimeout(()=>stoneFlash.style.opacity='0',280);
+  playSound(sndPetrify);
+  for(let i=0;i<18;i++) particles.push({
+    x:player.x+12+(Math.random()-.5)*20,y:player.y+16+(Math.random()-.5)*20,
+    vx:(Math.random()-.5)*3,vy:-Math.random()*4,
+    life:30+Math.random()*20,r:2+Math.random()*3,
+    color:`hsl(0,0%,${50+Math.random()*30}%)`
+  });
+  if(cause==='lava'){
+    overlayTitle.textContent='🔥 BURNED';
+    overlayMsg.textContent='The lava consumed you.';
+  } else if(byMedusa){
+    overlayTitle.textContent='🐍 PETRIFIED';
+    overlayMsg.textContent='Her gaze found you. Your stone remains.';
+  } else {
+    overlayTitle.textContent='YOU FELL';
+    overlayMsg.textContent='You fell into the abyss.';
+  }
+  overlayKey.textContent='PRESS SPACE OR CLICK TO RESPAWN';
+  overlay.classList.remove('hidden');
+}
+
+function respawn(){
+  if(gameState==='home') return;
+  resumeAudio();
+  if(gameState==='won'){
+    const next=currentLevelNum+1;
+    const hasRealNext=next<=LEVELS.length&&LEVELS[next-1].intro!=='Coming soon.';
+    if(hasRealNext){startLevel(next);}else{goHome();}
+    return;
+  }
+  if(gameState==='start'){
+    statues=[];killedMedusas=[];deaths=0;deathCountEl.textContent='DEATHS: 0';
+    levelStartTime=Date.now();
+  }
+  respawnPlayer(); gameState='playing'; overlay.classList.add('hidden');
+  playSound(sndRespawn);
+  keys={};
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════════════════════════
+function drawBackground(){
+  ctx.fillStyle='#0f0810';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.globalAlpha=0.12;
+  for(let i=0;i<8;i++){
+    const cx=((i*110-cameraX*0.3)%900+900)%(W+110)-20;
+    ctx.fillStyle='#8a7a6a';
+    ctx.fillRect(cx,100,18,H-100);ctx.fillRect(cx-6,95,30,18);ctx.fillRect(cx-6,H-48,30,18);
+  }
+  ctx.globalAlpha=0.25;ctx.fillStyle='#c9a84c';
+  for(let i=0;i<40;i++){
+    const sx=((i*173.13-cameraX*0.1)%W+W)%W,sy=(i*97.7)%(H*0.6);
+    ctx.beginPath();ctx.arc(sx,sy,0.8,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPlatform(pl){
+  const x=pl.x-cameraX;
+  ctx.fillStyle='#3a2e22';ctx.fillRect(x,pl.y,pl.w,pl.h);
+  ctx.fillStyle='#5a4a32';ctx.fillRect(x,pl.y,pl.w,4);
+  ctx.strokeStyle='#2a2018';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x+10,pl.y+6);ctx.lineTo(x+20,pl.y+20);
+  ctx.moveTo(x+pl.w-15,pl.y+6);ctx.lineTo(x+pl.w-25,pl.y+18);ctx.stroke();
+}
+
+function drawHumanoid(bx,by,facingRight,colors,alpha,wf){
+  ctx.save();ctx.globalAlpha=alpha;
+  if(!facingRight){ctx.translate(bx+24,0);ctx.scale(-1,1);ctx.translate(-bx,0);}
+  ctx.fillStyle=colors.tunic;ctx.fillRect(bx+6,by+10,12,14);
+  ctx.fillStyle=colors.skin;ctx.beginPath();ctx.arc(bx+12,by+7,7,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=colors.hair;ctx.beginPath();ctx.arc(bx+12,by+4,7,Math.PI,0);ctx.fill();
+  ctx.fillStyle=colors.eyes;ctx.fillRect(bx+9,by+6,2,2);ctx.fillRect(bx+13,by+6,2,2);
+  const leg=wf!==undefined?Math.sin(wf*Math.PI/2)*5:0;
+  const arm=wf!==undefined?Math.sin(wf*Math.PI/2)*3:0;
+  ctx.fillStyle=colors.legs;ctx.fillRect(bx+6,by+24,5,8+leg);ctx.fillRect(bx+13,by+24,5,8-leg);
+  ctx.fillStyle=colors.arms;ctx.fillRect(bx+2,by+11,4,8+arm);ctx.fillRect(bx+18,by+11,4,8-arm);
+  ctx.restore();
+}
+
+function drawShieldPickup(sh){
+  if(sh.collected) return;
+  const x=Math.floor(sh.x-cameraX),y=Math.floor(sh.y);
+  const pulse=0.6+0.4*Math.sin(Date.now()*0.004);
+  ctx.save();ctx.shadowBlur=14;ctx.shadowColor='#88ccff';ctx.globalAlpha=pulse*0.9;
+  ctx.fillStyle='#4488bb';ctx.beginPath();ctx.roundRect(x+2,y,16,22,4);ctx.fill();
+  ctx.fillStyle='#88ccff';ctx.fillRect(x+8,y+3,4,16);ctx.fillRect(x+4,y+9,12,4);
+  ctx.strokeStyle='#aaddff';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(x+2,y,16,22,4);ctx.stroke();
+  ctx.shadowBlur=0;ctx.globalAlpha=pulse*0.8;ctx.fillStyle='#88ccff';
+  ctx.font='7px Cinzel,serif';ctx.textAlign='center';ctx.fillText('SHIELD',x+sh.w/2,y-4);
+  ctx.restore();
+}
+
+function drawSwordPickup(sw){
+  if(sw.collected) return;
+  const x=Math.floor(sw.x-cameraX),y=Math.floor(sw.y);
+  const pulse=0.6+0.4*Math.sin(Date.now()*0.004+1);
+  ctx.save();ctx.shadowBlur=14;ctx.shadowColor='#ffcc44';ctx.globalAlpha=pulse*0.9;
+  ctx.fillStyle='#e8ddb0';ctx.fillRect(x+8,y,4,20);
+  ctx.fillStyle='#aa8833';ctx.fillRect(x+2,y+18,16,4);
+  ctx.fillStyle='#6a3a1a';ctx.fillRect(x+7,y+22,6,8);
+  ctx.fillStyle='#aa8833';ctx.beginPath();ctx.arc(x+10,y+31,3,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;ctx.globalAlpha=pulse*0.8;ctx.fillStyle='#ffcc66';
+  ctx.font='7px Cinzel,serif';ctx.textAlign='center';ctx.fillText('BLADE',x+sw.w/2,y-4);
+  ctx.restore();
+}
+
+function drawPlayer(){
+  const bx=Math.floor(player.x-cameraX),by=Math.floor(player.y);
+  drawHumanoid(bx,by,player.facingRight,
+    {tunic:'#c9a84c',skin:'#e8c88c',hair:'#3a2810',eyes:'#1a1008',legs:'#7a5a2a',arms:'#e8c88c'},
+    1,player.walkFrame);
+  if(player.hasShield){
+    ctx.save();
+    const sx=player.facingRight?bx+player.w-2:bx-14;
+    const pulse=player.shieldRaised?1:0.55+0.2*Math.sin(Date.now()*0.005);
+    if(player.shieldRaised){ctx.shadowBlur=18;ctx.shadowColor='#88ccff';}
+    ctx.globalAlpha=pulse;ctx.fillStyle=player.shieldRaised?'#aaddff':'#4488bb';
+    ctx.beginPath();ctx.roundRect(sx,by+6,10,20,3);ctx.fill();
+    ctx.strokeStyle='#88ccff';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(sx,by+6,10,20,3);ctx.stroke();
+    ctx.shadowBlur=0;ctx.restore();
+  }
+  if(player.hasSword&&swordSwipeTimer===0){
+    ctx.save();
+    const sx=player.facingRight?bx+player.w+1:bx-9;
+    ctx.shadowBlur=8;ctx.shadowColor='#ffcc44';ctx.globalAlpha=0.95;
+    ctx.fillStyle='#e8ddb0';ctx.fillRect(sx+3,by,3,18);
+    ctx.fillStyle='#aa8833';ctx.fillRect(sx,by+14,9,3);
+    ctx.fillStyle='#6a3a1a';ctx.fillRect(sx+2,by+17,5,7);
+    ctx.shadowBlur=0;ctx.restore();
+  }
+  
+  // Sword swipe animation - simple arc swipe in hand
+  if(swordSwipeTimer>0){
+    ctx.save();
+    const swipeProgress=1-(swordSwipeTimer/12);
+    // Simple rotation from raised to forward position
+    const swipeAngle=player.facingRight
+      ?(-Math.PI/4+(swipeProgress*Math.PI/2))
+      :(Math.PI/4-(swipeProgress*Math.PI/2));
+    
+    const handX=player.facingRight?bx+player.w:bx;
+    const handY=by+12;
+    
+    ctx.translate(handX,handY);
+    ctx.rotate(swipeAngle);
+    
+    // Enhanced glow during swing
+    ctx.shadowBlur=15;
+    ctx.shadowColor='#ffcc44';
+    ctx.globalAlpha=0.95;
+    
+    // Draw dagger blade pointing forward
+    ctx.fillStyle='#e8ddb0';
+    ctx.fillRect(-2,-20,4,18);
+    
+    // Cross guard
+    ctx.fillStyle='#aa8833';
+    ctx.fillRect(-5,-3,10,3);
+    
+    // Handle
+    ctx.fillStyle='#6a3a1a';
+    ctx.fillRect(-3,0,6,7);
+    
+    // Pommel
+    ctx.fillStyle='#aa8833';
+    ctx.beginPath();ctx.arc(0,8,3,0,Math.PI*2);ctx.fill();
+    
+    // Motion blur trail
+    ctx.globalAlpha=0.2;
+    ctx.strokeStyle='#ffcc44';
+    ctx.lineWidth=3;
+    ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(0,-20);
+    ctx.lineTo(0,-10);
+    ctx.stroke();
+    
+    ctx.shadowBlur=0;
+    ctx.restore();
+  }
+}
+
+function drawStatues(){
+  for(const s of statues){
+    const sx=Math.floor(s.x-cameraX),sy=Math.floor(s.y);
+    drawHumanoid(sx,sy,s.facingRight,
+      {tunic:'#8a8878',skin:'#9a9888',hair:'#6a6858',eyes:'#4a4838',legs:'#7a7868',arms:'#9a9888'},
+      0.85,undefined);
+    ctx.save();ctx.globalAlpha=0.5;ctx.strokeStyle='#5a5848';ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(sx+10,sy+2);ctx.lineTo(sx+14,sy+15);
+    ctx.moveTo(sx+8,sy+16);ctx.lineTo(sx+16,sy+22);ctx.stroke();
+    ctx.globalAlpha=0.9;ctx.fillStyle='#c9a84c';ctx.font='bold 8px Cinzel,serif';ctx.textAlign='center';
+    ctx.fillText('#'+s.id,sx+12,sy-2);ctx.restore();
+  }
+}
+
+function drawMedusa(m){
+  if(m.killed) return; // Don't draw killed medusas
+  const x=Math.floor(m.x-cameraX);
+  const y=Math.floor(m.petrified?m.groundY:m.y);
+  ctx.save();
+  if(m.facingRight){ctx.translate(x+m.w,0);ctx.scale(-1,1);ctx.translate(-x,0);}
+  const bx=x,by=y;
+
+  if(m.petrified){
+    ctx.globalAlpha=0.9;
+    ctx.fillStyle='#5a5040';
+    ctx.beginPath();ctx.moveTo(bx+4,by+14);ctx.lineTo(bx,by+m.h);ctx.lineTo(bx+m.w,by+m.h);ctx.lineTo(bx+m.w-4,by+14);ctx.closePath();ctx.fill();
+    ctx.fillRect(bx+6,by+10,16,14);
+    ctx.fillStyle='#8a8070';ctx.beginPath();ctx.arc(bx+14,by+8,9,0,Math.PI*2);ctx.fill();
+    for(let i=0;i<6;i++){
+      const ang=(i/6)*Math.PI;
+      ctx.fillStyle='#6a6050';ctx.beginPath();ctx.arc(bx+14+Math.cos(ang)*9,by-2+Math.sin(ang)*5,2.5,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle='#5a5040';ctx.fillRect(bx+10,by+6,3,3);ctx.fillRect(bx+16,by+6,3,3);
+    ctx.strokeStyle='#4a4030';ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(bx+10,by+2);ctx.lineTo(bx+16,by+18);ctx.moveTo(bx+6,by+14);ctx.lineTo(bx+20,by+26);ctx.stroke();
+    ctx.restore();return;
+  }
+
+  const alert=m.alertTimer>5;
+  const aggroed=m.chaser&&Math.abs(player.x+12-(m.x+14))<m.aggroRange&&!(player.y+player.h<m.y);
+  const robe=m.chaser?(aggroed?'#9a1a0a':'#6a1a0a'):(alert?'#8b1a1a':'#2a4a2a');
+  ctx.fillStyle=robe;
+  ctx.beginPath();ctx.moveTo(bx+4,by+14);ctx.lineTo(bx,by+m.h);ctx.lineTo(bx+m.w,by+m.h);ctx.lineTo(bx+m.w-4,by+14);ctx.closePath();ctx.fill();
+  ctx.fillRect(bx+6,by+10,16,14);
+  ctx.fillStyle='#c8a882';ctx.beginPath();ctx.arc(bx+14,by+8,9,0,Math.PI*2);ctx.fill();
+  const sc=m.chaser?['#8a2a2a','#6a1a1a','#aa3a2a','#4a1010']:['#2d7a2d','#1a5a1a','#3a8a3a','#145a14'];
+  for(let i=0;i<6;i++){
+    const ang=(i/6)*Math.PI+m.animFrame*0.3;
+    const hx=bx+14+Math.cos(ang)*9,hy=by-2+Math.sin(ang)*5;
+    ctx.fillStyle=sc[i%4];ctx.beginPath();ctx.arc(hx,hy,2.5,0,Math.PI*2);ctx.fill();
+    if(m.animFrame===1&&i%2===0){
+      ctx.strokeStyle=m.chaser?'#ff2200':'#ff4444';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(hx,hy+2);ctx.lineTo(hx-2,hy+5);ctx.moveTo(hx,hy+2);ctx.lineTo(hx+2,hy+5);ctx.stroke();
+    }
+  }
+  const eyeColor=m.chaser?(aggroed?'#ff3300':'#cc4400'):(alert?'#ffee00':'#ffd700');
+  if(alert||aggroed){ctx.shadowBlur=15;ctx.shadowColor=eyeColor;}
+  ctx.fillStyle=eyeColor;
+  ctx.beginPath();ctx.arc(bx+10,by+8,2.5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(bx+18,by+8,2.5,0,Math.PI*2);ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.restore();
+}
+
+function drawSightZones(){
+  const CONE_TAN=0.7;
+  for(const m of medusas){
+    if(m.petrified||m.killed) continue;
+    const mx=m.x+m.w/2-cameraX, my=m.y+m.h/2;
+    const dir=m.lookDir;
+    const SR=m.sightRange;
+    const alert=m.alertTimer>5;
+    const t=Date.now()*0.002;
+    const pulseFactor=0.5+0.3*Math.sin(t*1.5+m.x*0.02);
+    const [r,g,b]=m.chaser?[255,60,30]:alert?[255,220,50]:[100,180,220];
+    
+    // Simple cone - just a triangle
+    const endX=mx+dir*SR;
+    const halfH=Math.min(60,SR*CONE_TAN);
+    
+    ctx.save();
+    ctx.globalAlpha=pulseFactor;
+    
+    // Gradient from eye to end
+    const grad=ctx.createLinearGradient(mx,0,endX,0);
+    const baseAlpha=alert?0.22:0.12;
+    grad.addColorStop(0,`rgba(${r},${g},${b},${baseAlpha})`);
+    grad.addColorStop(0.5,`rgba(${r},${g},${b},${baseAlpha*0.5})`);
+    grad.addColorStop(1,`rgba(${r},${g},${b},0)`);
+    
+    // Draw cone
+    ctx.beginPath();
+    ctx.moveTo(mx,my);
+    ctx.lineTo(endX,my-halfH);
+    ctx.lineTo(endX,my+halfH);
+    ctx.closePath();
+    ctx.fillStyle=grad;
+    ctx.fill();
+    
+    // Edge lines
+    ctx.globalAlpha=pulseFactor*(alert?0.5:0.3);
+    ctx.strokeStyle=`rgba(${r},${g},${b},0.6)`;
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(mx,my);
+    ctx.lineTo(endX,my-halfH);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mx,my);
+    ctx.lineTo(endX,my+halfH);
+    ctx.stroke();
+    
+    ctx.restore();
+    
+    // Eye glow
+    const ex=Math.floor(mx),ey=Math.floor(my-6);
+    ctx.save();
+    const eyeGrad=ctx.createRadialGradient(ex,ey,0,ex,ey,12);
+    const eyeAlpha=pulseFactor*(alert?0.7:0.5);
+    eyeGrad.addColorStop(0,`rgba(${r},${g},${b},${eyeAlpha})`);
+    eyeGrad.addColorStop(0.5,`rgba(${r},${g},${b},${eyeAlpha*0.4})`);
+    eyeGrad.addColorStop(1,`rgba(${r},${g},${b},0)`);
+    ctx.fillStyle=eyeGrad; ctx.beginPath();ctx.arc(ex,ey,12,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawGoal(){
+  const g=currentLevel.goal,x=g.x-cameraX;
+  const pulse=0.7+0.3*Math.sin(Date.now()*0.003);
+  ctx.save();ctx.shadowBlur=20;ctx.shadowColor='#c9a84c';
+  ctx.fillStyle=`rgba(201,168,76,${pulse*0.28})`;ctx.fillRect(x,g.y,g.w,g.h);
+  ctx.strokeStyle=`rgba(201,168,76,${pulse})`;ctx.lineWidth=2;ctx.strokeRect(x,g.y,g.w,g.h);
+  ctx.fillStyle='#c9a84c';ctx.font='20px serif';ctx.textAlign='center';
+  ctx.fillText('🏛️',x+g.w/2,g.y+g.h/2+7);ctx.shadowBlur=0;ctx.restore();
+}
+
+function drawParticles(){
+  for(const p of particles){
+    ctx.save();ctx.globalAlpha=p.life/50;ctx.fillStyle=p.color;
+    ctx.beginPath();ctx.arc(p.x-cameraX,p.y,p.r,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+}
+
+function drawInstructions(){
+  // Instructions now shown in footer, not on canvas
+}
+
+function drawHUD(){
+  let badgeY=10;
+  if(player&&player.hasShield){
+    ctx.save();ctx.globalAlpha=0.85;
+    const pulse=player.shieldRaised?1:0.6+0.2*Math.sin(Date.now()*0.005);
+    ctx.fillStyle='#0a1520';ctx.fillRect(10,badgeY,110,26);
+    ctx.strokeStyle=player.shieldRaised?'#88ccff':'#336699';ctx.lineWidth=1.5;ctx.strokeRect(10,badgeY,110,26);
+    ctx.globalAlpha=pulse;ctx.fillStyle=player.shieldRaised?'#aaddff':'#5599bb';
+    ctx.font='10px Cinzel,serif';ctx.textAlign='center';
+    ctx.fillText(player.shieldRaised?'⬡ SHIELD RAISED':'⬡ SHIELD  [F]',65,badgeY+17);
+    ctx.restore();badgeY+=32;
+  }
+  if(player&&player.hasSword){
+    ctx.save();ctx.globalAlpha=0.85;
+    const pulse=0.7+0.2*Math.sin(Date.now()*0.006);
+    ctx.fillStyle='#1a1205';ctx.fillRect(10,badgeY,110,26);
+    ctx.strokeStyle='#aa8833';ctx.lineWidth=1.5;ctx.strokeRect(10,badgeY,110,26);
+    ctx.globalAlpha=pulse;ctx.fillStyle='#ffcc44';
+    ctx.font='10px Cinzel,serif';ctx.textAlign='center';
+    ctx.fillText('⚔ BLADE  [E]',65,badgeY+17);
+    ctx.restore();
+  }
+}
+
+function draw(){
+  if(!currentLevel) return;
+  drawBackground();
+  
+  // Lava pits
+  for(const lp of (currentLevel.lavaPits||[])){
+    const x=lp.x-cameraX;
+    // Base lava fill
+    ctx.fillStyle='#8a2a0a';ctx.fillRect(x,lp.y,lp.w,lp.h);
+    // Bright surface layer
+    ctx.fillStyle='#cc4400';ctx.fillRect(x,lp.y,lp.w,6);
+    ctx.fillStyle='#ff6622';ctx.fillRect(x,lp.y,lp.w,3);
+    // Subtle bubbles
+    ctx.fillStyle='#ff8844';
+    for(let i=0;i<3;i++){
+      const bx=x+10+i*(lp.w/3)+Math.sin(Date.now()*0.001+i*2)*4;
+      const by=lp.y+8+Math.sin(Date.now()*0.002+i)*3;
+      ctx.beginPath();ctx.arc(bx,by,3,0,Math.PI*2);ctx.fill();
+    }
+  }
+  
+  for(const pl of currentLevel.platforms) drawPlatform(pl);
+  
+  // Movable platforms
+  for(const mp of movablePlatforms){
+    drawPlatform({x:mp.x,y:mp.currentY,w:mp.w,h:mp.h});
+  }
+  
+  // Pressure plates
+  for(const pp of pressurePlates){
+    const x=pp.x-cameraX;
+    ctx.fillStyle=pp.activated?'#aa8833':'#6a5a3a';
+    ctx.fillRect(x,pp.y,pp.w,pp.h);
+    ctx.strokeStyle=pp.activated?'#ffcc66':'#8a7a5a';
+    ctx.lineWidth=2;ctx.strokeRect(x+2,pp.y+1,pp.w-4,pp.h-2);
+  }
+  
+  // Boxes
+  for(const b of boxes){
+    const x=b.x-cameraX;
+    ctx.fillStyle='#6a4a2a';ctx.fillRect(x,b.y,b.w,b.h);
+    ctx.strokeStyle='#4a3a1a';ctx.lineWidth=1.5;ctx.strokeRect(x,b.y,b.w,b.h);
+    ctx.strokeStyle='#8a6a4a';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x+4,b.y+4);ctx.lineTo(x+b.w-4,b.y+b.h-4);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x+b.w-4,b.y+4);ctx.lineTo(x+4,b.y+b.h-4);ctx.stroke();
+  }
+  
+  drawGoal();
+  for(const sh of shields) drawShieldPickup(sh);
+  for(const sw of swords) drawSwordPickup(sw);
+  drawStatues();
+  drawSightZones();
+  for(const m of medusas) drawMedusa(m);
+  if(gameState==='playing') drawPlayer();
+  drawParticles();drawHUD();drawInstructions();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  LOOP & INPUT
+// ═══════════════════════════════════════════════════════════
+function loop(){update();if(gameState!=='home')draw();requestAnimationFrame(loop);}
+
+document.addEventListener('keydown',e=>{
+  keys[e.key]=true;
+  resumeAudio();
+  if(e.key===' '){e.preventDefault();if(gameState!=='playing'&&gameState!=='home')respawn();}
+  if(e.key==='Escape') goHome();
+  // R to fully reset level — same as clicking from home, but skip the intro overlay
+  if((e.key==='r'||e.key==='R')&&(gameState==='playing'||gameState==='petrified')){
+    startLevel(currentLevelNum);
+    overlay.classList.add('hidden');
+    gameState='playing';
+    keys={};
+  }
+});
+document.addEventListener('keyup',e=>{keys[e.key]=false;});
+document.addEventListener('pointerdown',resumeAudio,{passive:true});
+
+buildHomeScreen();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
